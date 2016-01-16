@@ -1,0 +1,382 @@
+diff -ur openexr-2.1.0/IlmImf/CMakeLists.txt openexr-2.1.0.mine/IlmImf/CMakeLists.txt
+--- openexr-2.1.0/IlmImf/CMakeLists.txt	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImf/CMakeLists.txt	Thu Dec 12 09:48:08 2013
+@@ -5,9 +5,9 @@
+   b44ExpLogTable.cpp
+   )
+ TARGET_LINK_LIBRARIES ( b44ExpLogTable
+-  Half
+-  Iex-2_1
+-  IlmThread-2_1
++  Half${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+ )
+ 
+@@ -123,10 +123,10 @@
+ )
+ 
+ TARGET_LINK_LIBRARIES ( IlmImf 
+-  Half 
+-  Iex-2_1 
+-  Imath-2_1 
+-  IlmThread-2_1 
++  Half${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  Imath-2_1${CMAKE_DEBUG_POSTFIX}
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB} ${ZLIB_LIBRARIES}
+ )
+ 
+@@ -136,7 +136,7 @@
+ SET_SOURCE_FILES_PROPERTIES (
+   ImfB44Compressor.cpp
+   PROPERTIES
+-  OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/b44ExpLogTable.h
++  OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/IlmImf/b44ExpLogTable.h
+ )
+ 
+ # Libraries
+diff -ur openexr-2.1.0/IlmImf/ImfAcesFile.cpp openexr-2.1.0.mine/IlmImf/ImfAcesFile.cpp
+--- openexr-2.1.0/IlmImf/ImfAcesFile.cpp	Tue Jun 18 21:51:39 2013
++++ openexr-2.1.0.mine/IlmImf/ImfAcesFile.cpp	Thu Dec 12 07:58:24 2013
+@@ -42,6 +42,7 @@
+ #include <ImfRgbaFile.h>
+ #include <ImfStandardAttributes.h>
+ #include <Iex.h>
++#include <algorithm>
+ 
+ using namespace std;
+ using namespace IMATH_NAMESPACE;
+diff -ur openexr-2.1.0/IlmImf/ImfDeepScanLineInputFile.cpp openexr-2.1.0.mine/IlmImf/ImfDeepScanLineInputFile.cpp
+--- openexr-2.1.0/IlmImf/ImfDeepScanLineInputFile.cpp	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImf/ImfDeepScanLineInputFile.cpp	Thu Dec 12 07:59:19 2013
+@@ -69,6 +69,7 @@
+ #include <vector>
+ #include <assert.h>
+ #include <limits>
++#include <algorithm>
+ 
+ 
+ #include "ImfNamespace.h"
+diff -ur openexr-2.1.0/IlmImf/ImfDeepScanLineOutputFile.cpp openexr-2.1.0.mine/IlmImf/ImfDeepScanLineOutputFile.cpp
+--- openexr-2.1.0/IlmImf/ImfDeepScanLineOutputFile.cpp	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImf/ImfDeepScanLineOutputFile.cpp	Thu Dec 12 08:00:26 2013
+@@ -64,6 +64,7 @@
+ #include <vector>
+ #include <fstream>
+ #include <assert.h>
++#include <algorithm>
+ 
+ #include "ImfNamespace.h"
+ 
+diff -ur openexr-2.1.0/IlmImf/ImfDeepTiledOutputFile.cpp openexr-2.1.0.mine/IlmImf/ImfDeepTiledOutputFile.cpp
+--- openexr-2.1.0/IlmImf/ImfDeepTiledOutputFile.cpp	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImf/ImfDeepTiledOutputFile.cpp	Thu Dec 12 07:59:45 2013
+@@ -71,6 +71,7 @@
+ #include <fstream>
+ #include <assert.h>
+ #include <map>
++#include <algorithm>
+ 
+ #include "ImfNamespace.h"
+ 
+diff -ur openexr-2.1.0/IlmImf/ImfOutputFile.cpp openexr-2.1.0.mine/IlmImf/ImfOutputFile.cpp
+--- openexr-2.1.0/IlmImf/ImfOutputFile.cpp	Sat Nov  9 00:25:23 2013
++++ openexr-2.1.0.mine/IlmImf/ImfOutputFile.cpp	Thu Dec 12 07:54:33 2013
+@@ -66,6 +66,7 @@
+ 
+ #include <string>
+ #include <vector>
++#include <algorithm>
+ #include <fstream>
+ #include <assert.h>
+ 
+diff -ur openexr-2.1.0/IlmImf/ImfTiledMisc.cpp openexr-2.1.0.mine/IlmImf/ImfTiledMisc.cpp
+--- openexr-2.1.0/IlmImf/ImfTiledMisc.cpp	Tue Jun 18 21:51:39 2013
++++ openexr-2.1.0.mine/IlmImf/ImfTiledMisc.cpp	Thu Dec 12 07:55:54 2013
+@@ -44,6 +44,7 @@
+ #include <ImfMisc.h>
+ #include <ImfChannelList.h>
+ #include <ImfTileDescription.h>
++#include <algorithm>
+ 
+ #include "ImfNamespace.h"
+ 
+diff -ur openexr-2.1.0/IlmImf/ImfTiledOutputFile.cpp openexr-2.1.0.mine/IlmImf/ImfTiledOutputFile.cpp
+--- openexr-2.1.0/IlmImf/ImfTiledOutputFile.cpp	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImf/ImfTiledOutputFile.cpp	Thu Dec 12 07:57:08 2013
+@@ -68,6 +68,7 @@
+ #include <fstream>
+ #include <assert.h>
+ #include <map>
++#include <algorithm>
+ 
+ #include "ImfNamespace.h"
+ 
+diff -ur openexr-2.1.0/IlmImfExamples/CMakeLists.txt openexr-2.1.0.mine/IlmImfExamples/CMakeLists.txt
+--- openexr-2.1.0/IlmImfExamples/CMakeLists.txt	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImfExamples/CMakeLists.txt	Thu Dec 12 08:16:21 2013
+@@ -14,10 +14,10 @@
+ 
+ TARGET_LINK_LIBRARIES ( IlmImfExamples 
+         IlmImf
+-        Half 
+-        Iex-2_1
+-        Imath-2_1 
+-        IlmThread-2_1 
++        Half${CMAKE_DEBUG_POSTFIX} 
++        Iex-2_1${CMAKE_DEBUG_POSTFIX}
++        Imath-2_1${CMAKE_DEBUG_POSTFIX} 
++        IlmThread-2_1${CMAKE_DEBUG_POSTFIX} 
+         ${PTHREAD_LIB} ${ZLIB_LIBRARIES}
+         )
+   
+diff -ur openexr-2.1.0/IlmImfExamples/previewImageExamples.cpp openexr-2.1.0.mine/IlmImfExamples/previewImageExamples.cpp
+--- openexr-2.1.0/IlmImfExamples/previewImageExamples.cpp	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImfExamples/previewImageExamples.cpp	Thu Dec 12 08:01:41 2013
+@@ -49,6 +49,7 @@
+ #include "drawImage.h"
+ 
+ #include <iostream>
++#include <algorithm>
+ 
+ #include "namespaceAlias.h"
+ using namespace IMF;
+diff -ur openexr-2.1.0/IlmImfExamples/rgbaInterfaceExamples.cpp openexr-2.1.0.mine/IlmImfExamples/rgbaInterfaceExamples.cpp
+--- openexr-2.1.0/IlmImfExamples/rgbaInterfaceExamples.cpp	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImfExamples/rgbaInterfaceExamples.cpp	Thu Dec 12 08:02:07 2013
+@@ -51,6 +51,7 @@
+ #include "drawImage.h"
+ 
+ #include <iostream>
++#include <algorithm>
+ 
+ #include "namespaceAlias.h"
+ using namespace IMF;
+diff -ur openexr-2.1.0/IlmImfFuzzTest/CMakeLists.txt openexr-2.1.0.mine/IlmImfFuzzTest/CMakeLists.txt
+--- openexr-2.1.0/IlmImfFuzzTest/CMakeLists.txt	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImfFuzzTest/CMakeLists.txt	Thu Dec 12 09:00:20 2013
+@@ -11,10 +11,10 @@
+ 
+ TARGET_LINK_LIBRARIES ( IlmImfFuzzTest 
+         IlmImf
+-        Half
+-        Iex-2_1
+-        Imath-2_1
+-        IlmThread-2_1
++        Half${CMAKE_DEBUG_POSTFIX}
++        Iex-2_1${CMAKE_DEBUG_POSTFIX}
++        Imath-2_1${CMAKE_DEBUG_POSTFIX}
++        IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
+         ${PTHREAD_LIB} ${ZLIB_LIBRARIES})
+ 
+ ADD_TEST ( TestIlmImfFuzz IlmImfFuzzTest )
+diff -ur openexr-2.1.0/IlmImfTest/CMakeLists.txt openexr-2.1.0.mine/IlmImfTest/CMakeLists.txt
+--- openexr-2.1.0/IlmImfTest/CMakeLists.txt	Mon Nov 25 20:49:53 2013
++++ openexr-2.1.0.mine/IlmImfTest/CMakeLists.txt	Thu Dec 12 08:26:49 2013
+@@ -62,10 +62,10 @@
+ ADD_TEST ( TestIlmImf IlmImfTest )
+ TARGET_LINK_LIBRARIES ( IlmImfTest 
+         IlmImf  
+-        Half 
+-        Iex-2_1
+-        Imath-2_1 
+-        IlmThread-2_1 
++        Half${CMAKE_DEBUG_POSTFIX}  
++        Iex-2_1${CMAKE_DEBUG_POSTFIX} 
++        Imath-2_1${CMAKE_DEBUG_POSTFIX}  
++        IlmThread-2_1${CMAKE_DEBUG_POSTFIX}  
+         ${PTHREAD_LIB} ${ZLIB_LIBRARIES}
+         )
+ 
+diff -ur openexr-2.1.0/IlmImfTest/testMultiTiledPartThreading.cpp openexr-2.1.0.mine/IlmImfTest/testMultiTiledPartThreading.cpp
+--- openexr-2.1.0/IlmImfTest/testMultiTiledPartThreading.cpp	Mon Nov 25 20:49:54 2013
++++ openexr-2.1.0.mine/IlmImfTest/testMultiTiledPartThreading.cpp	Thu Dec 12 08:21:33 2013
+@@ -58,6 +58,7 @@
+ #include <IlmThreadPool.h>
+ #include <IlmThreadMutex.h>
+ 
++#include <algorithm>
+ 
+ namespace
+ {
+diff -ur openexr-2.1.0/IlmImfTest/testPartHelper.cpp openexr-2.1.0.mine/IlmImfTest/testPartHelper.cpp
+--- openexr-2.1.0/IlmImfTest/testPartHelper.cpp	Mon Nov 25 20:49:55 2013
++++ openexr-2.1.0.mine/IlmImfTest/testPartHelper.cpp	Thu Dec 12 08:24:01 2013
+@@ -36,6 +36,7 @@
+ #include <ImfPartHelper.h>
+ #include <vector>
+ #include <iostream>
++#include <algorithm>
+ 
+ using std::vector;
+ using std::cout;
+diff -ur openexr-2.1.0/IlmImfTest/testTiledCompression.cpp openexr-2.1.0.mine/IlmImfTest/testTiledCompression.cpp
+--- openexr-2.1.0/IlmImfTest/testTiledCompression.cpp	Mon Nov 25 20:49:55 2013
++++ openexr-2.1.0.mine/IlmImfTest/testTiledCompression.cpp	Thu Dec 12 08:25:11 2013
+@@ -50,6 +50,7 @@
+ 
+ #include <stdio.h>
+ #include <assert.h>
++#include <algorithm>
+ 
+ namespace IMF = OPENEXR_IMF_NAMESPACE;
+ using namespace IMF;
+diff -ur openexr-2.1.0/IlmImfTest/testTiledRgba.cpp openexr-2.1.0.mine/IlmImfTest/testTiledRgba.cpp
+--- openexr-2.1.0/IlmImfTest/testTiledRgba.cpp	Mon Nov 25 20:49:55 2013
++++ openexr-2.1.0.mine/IlmImfTest/testTiledRgba.cpp	Thu Dec 12 08:26:03 2013
+@@ -48,6 +48,7 @@
+ #include <assert.h>
+ #include <vector>
+ #include <math.h>
++#include <algorithm>
+ 
+ 
+ using namespace OPENEXR_IMF_NAMESPACE;
+diff -ur openexr-2.1.0/exrenvmap/CMakeLists.txt openexr-2.1.0.mine/exrenvmap/CMakeLists.txt
+--- openexr-2.1.0/exrenvmap/CMakeLists.txt	Mon Nov 25 20:49:55 2013
++++ openexr-2.1.0.mine/exrenvmap/CMakeLists.txt	Thu Dec 12 09:31:23 2013
+@@ -12,9 +12,9 @@
+ 
+ TARGET_LINK_LIBRARIES ( exrenvmap
+   IlmImf
+-  IlmThread-2_1
+-  Iex-2_1
+-  Half
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  Half${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+   ${ZLIB_LIBRARIES}
+ )
+diff -ur openexr-2.1.0/exrheader/CMakeLists.txt openexr-2.1.0.mine/exrheader/CMakeLists.txt
+--- openexr-2.1.0/exrheader/CMakeLists.txt	Mon Nov 25 20:49:55 2013
++++ openexr-2.1.0.mine/exrheader/CMakeLists.txt	Thu Dec 12 09:06:31 2013
+@@ -6,9 +6,9 @@
+ 
+ TARGET_LINK_LIBRARIES ( exrheader
+   IlmImf
+-  Iex-2_1
+-  IlmThread-2_1
+-  Half
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
++  Half${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+   ${ZLIB_LIBRARIES}
+ )
+diff -ur openexr-2.1.0/exrmakepreview/CMakeLists.txt openexr-2.1.0.mine/exrmakepreview/CMakeLists.txt
+--- openexr-2.1.0/exrmakepreview/CMakeLists.txt	Mon Nov 25 20:49:56 2013
++++ openexr-2.1.0.mine/exrmakepreview/CMakeLists.txt	Thu Dec 12 09:31:09 2013
+@@ -7,9 +7,9 @@
+ 
+ TARGET_LINK_LIBRARIES ( exrmakepreview
+   IlmImf
+-  IlmThread-2_1
+-  Iex-2_1
+-  Half
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  Half${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+   ${ZLIB_LIBRARIES}
+ )
+diff -ur openexr-2.1.0/exrmakepreview/makePreview.cpp openexr-2.1.0.mine/exrmakepreview/makePreview.cpp
+--- openexr-2.1.0/exrmakepreview/makePreview.cpp	Tue Jun 18 21:51:40 2013
++++ openexr-2.1.0.mine/exrmakepreview/makePreview.cpp	Thu Dec 12 09:23:15 2013
+@@ -52,6 +52,7 @@
+ #include <ImathFun.h>
+ #include <math.h>
+ #include <iostream>
++#include <algorithm>
+ 
+ #include <OpenEXRConfig.h>
+ using namespace OPENEXR_IMF_NAMESPACE;
+diff -ur openexr-2.1.0/exrmaketiled/CMakeLists.txt openexr-2.1.0.mine/exrmaketiled/CMakeLists.txt
+--- openexr-2.1.0/exrmaketiled/CMakeLists.txt	Mon Nov 25 20:49:56 2013
++++ openexr-2.1.0.mine/exrmaketiled/CMakeLists.txt	Thu Dec 12 09:13:38 2013
+@@ -8,9 +8,9 @@
+ 
+ TARGET_LINK_LIBRARIES ( exrmaketiled
+   IlmImf
+-  IlmThread-2_1
+-  Iex-2_1
+-  Half
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  Half${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+   ${ZLIB_LIBRARIES}
+ )
+diff -ur openexr-2.1.0/exrmultipart/CMakeLists.txt openexr-2.1.0.mine/exrmultipart/CMakeLists.txt
+--- openexr-2.1.0/exrmultipart/CMakeLists.txt	Mon Nov 25 20:49:56 2013
++++ openexr-2.1.0.mine/exrmultipart/CMakeLists.txt	Thu Dec 12 09:30:55 2013
+@@ -6,9 +6,9 @@
+ 
+ TARGET_LINK_LIBRARIES ( exrmultipart
+   IlmImf
+-  IlmThread-2_1
+-  Iex-2_1
+-  Half
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  Half${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+   ${ZLIB_LIBRARIES}
+ )
+diff -ur openexr-2.1.0/exrmultipart/exrmultipart.cpp openexr-2.1.0.mine/exrmultipart/exrmultipart.cpp
+--- openexr-2.1.0/exrmultipart/exrmultipart.cpp	Mon Nov 25 20:49:56 2013
++++ openexr-2.1.0.mine/exrmultipart/exrmultipart.cpp	Thu Dec 12 09:30:24 2013
+@@ -64,6 +64,7 @@
+ #include <stdlib.h>
+ #include <sstream>
+ #include <assert.h>
++#include <algorithm>
+ 
+ using std::cerr;
+ using std::cout;
+@@ -138,7 +139,7 @@
+ is_number(const std::string& s)
+ {
+     std::string::const_iterator it = s.begin();
+-    while (it != s.end() && std::isdigit(*it)) ++it;
++    while (it != s.end() && isdigit(*it)) ++it;
+     return !s.empty() && it == s.end();
+ }
+ 
+diff -ur openexr-2.1.0/exrmultiview/CMakeLists.txt openexr-2.1.0.mine/exrmultiview/CMakeLists.txt
+--- openexr-2.1.0/exrmultiview/CMakeLists.txt	Mon Nov 25 20:49:56 2013
++++ openexr-2.1.0.mine/exrmultiview/CMakeLists.txt	Thu Dec 12 09:31:33 2013
+@@ -8,10 +8,10 @@
+ 
+ TARGET_LINK_LIBRARIES ( exrmultiview
+   IlmImf
+-  Half
+-  Imath-2_1
+-  Iex-2_1
+-  IlmThread-2_1
++  Half${CMAKE_DEBUG_POSTFIX}
++  Imath-2_1${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+   ${ZLIB_LIBRARIES}
+ )
+diff -ur openexr-2.1.0/exrstdattr/CMakeLists.txt openexr-2.1.0.mine/exrstdattr/CMakeLists.txt
+--- openexr-2.1.0/exrstdattr/CMakeLists.txt	Mon Nov 25 20:49:56 2013
++++ openexr-2.1.0.mine/exrstdattr/CMakeLists.txt	Thu Dec 12 09:18:24 2013
+@@ -6,9 +6,9 @@
+ 
+ TARGET_LINK_LIBRARIES ( exrstdattr
+   IlmImf
+-  IlmThread-2_1
+-  Iex-2_1
+-  Half
++  IlmThread-2_1${CMAKE_DEBUG_POSTFIX}
++  Iex-2_1${CMAKE_DEBUG_POSTFIX}
++  Half${CMAKE_DEBUG_POSTFIX}
+   ${PTHREAD_LIB}
+   ${ZLIB_LIBRARIES}
+ )
