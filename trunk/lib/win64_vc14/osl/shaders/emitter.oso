@@ -1,5 +1,5 @@
 OpenShadingLanguage 1.00
-# Compiled by oslc 1.7.2
+# Compiled by oslc 1.7.3
 # options: -q
 surface emitter	%meta{string,help,"Lambertian emitter material"} 
 param	float	power	1		%meta{string,help,"Total power of the light"}  %read{3,3} %write{2147483647,-1}
@@ -13,9 +13,9 @@ temp	float	$tmp3	%read{3,3} %write{2,2}
 temp	float	$tmp4	%read{4,4} %write{3,3}
 temp	color	$tmp5	%read{5,5} %write{4,4}
 code ___main___
-# Z:/test_lib/blender_dependencies/Build2015_Release/build/osl/src/external_osl/src/shaders/emitter.osl:44
+# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/emitter.osl:44
 #     Ci = (power / (M_PI * surfacearea())) * Cs * emission();
-	closure		$tmp1 $const1 	%filename{"Z:/test_lib/blender_dependencies/Build2015_Release/build/osl/src/external_osl/src/shaders/emitter.osl"} %line{44} %argrw{"wr"}
+	closure		$tmp1 $const1 	%filename{"E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/emitter.osl"} %line{44} %argrw{"wr"}
 	surfacearea	$tmp2 	%argrw{"w"}
 	mul		$tmp3 $const2 $tmp2 	%argrw{"wrr"}
 	div		$tmp4 power $tmp3 	%argrw{"wrr"}
