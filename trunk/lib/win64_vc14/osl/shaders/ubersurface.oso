@@ -1,5 +1,5 @@
 OpenShadingLanguage 1.00
-# Compiled by oslc 1.7.3
+# Compiled by oslc 1.7.5
 # options: -q
 surface ubersurface
 param	float	Opacity	1		%meta{string,help,"The overall opacity of the surface"} %meta{string,page,"Opacity"} %meta{float,UImin,0} %meta{float,UImax,1}  %read{17,17} %write{2147483647,-1}

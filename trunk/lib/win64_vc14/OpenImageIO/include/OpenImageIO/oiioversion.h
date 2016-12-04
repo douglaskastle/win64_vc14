@@ -37,10 +37,10 @@
 
 #define OIIO_NAMESPACE OpenImageIO
 #define OIIO_VERSION_MAJOR 1
-#define OIIO_VERSION_MINOR 6
-#define OIIO_VERSION_PATCH 9
+#define OIIO_VERSION_MINOR 7
+#define OIIO_VERSION_PATCH 8
 #define OIIO_VERSION_RELEASE_TYPE 
-#define OIIO_VERSION_NS v1_6
+#define OIIO_VERSION_NS v1_7
 
 #define OIIO_VERSION (10000 * OIIO_VERSION_MAJOR + \
                         100 * OIIO_VERSION_MINOR + \
@@ -48,7 +48,7 @@
 // We also define the old name for backwards compatibility purposes.
 #define OPENIMAGEIO_VERSION OIIO_VERSION
 
-// Magic macros to make OPENIMAGEIO_VERSION_STRING that looks like "1.2.3"
+// Magic macros to make OIIO_VERSION_STRING that looks like "1.2.3"
 #define OIIO_MAKE_VERSION_STRING2(a,b,c,d) #a "." #b "." #c #d
 #define OIIO_MAKE_VERSION_STRING(a,b,c,d) OIIO_MAKE_VERSION_STRING2(a,b,c,d)
 #define OIIO_VERSION_STRING \
@@ -106,8 +106,10 @@ namespace OIIO = OIIO_NAMESPACE::OIIO_VERSION_NS;
 /// Version 17 changed to int supports(string_view) rather than
 ///     bool supports(const std::string&)). (OIIO 1.6)
 /// Version 18 changed to add an m_threads member to ImageInput/Output.
+/// Version 19 changed the definition of DeepData.
+/// Version 20 added FMT_imageio_library_version() to plugins. (OIIO 1.7)
 
-#define OIIO_PLUGIN_VERSION 18
+#define OIIO_PLUGIN_VERSION 20
 
 #define OIIO_PLUGIN_NAMESPACE_BEGIN OIIO_NAMESPACE_BEGIN
 #define OIIO_PLUGIN_NAMESPACE_END OIIO_NAMESPACE_END
@@ -120,12 +122,10 @@ namespace OIIO = OIIO_NAMESPACE::OIIO_VERSION_NS;
 #define OIIO_PLUGIN_EXPORTS_END }
 #endif
 
-/// OIIO_BUILD_CPP11 will be 1 if this OIIO was built using C++11
-#define OIIO_BUILD_CPP11 0
-/// OIIO_BUILD_CPP14 will be 1 if this OIIO was built using C++14
+// OIIO_BUILD_CPP11 will be 1 if this OIIO was built using C++11
+#define OIIO_BUILD_CPP11 1
+// OIIO_BUILD_CPP14 will be 1 if this OIIO was built using C++14
 #define OIIO_BUILD_CPP14 0
-/// OIIO_BUILD_USELIBPLUSPLUS will be 1 if this OIIO was built using libc++
-#define OIIO_BUILD_LIBCPLUSPLUS 0
 
 #endif
 

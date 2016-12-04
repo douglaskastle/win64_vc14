@@ -78,9 +78,8 @@ public:
     ImageCache (void) { }
     virtual ~ImageCache () { }
 
-    /// Close everything, free resources, start from scratch.
-    ///
-    virtual void clear () = 0;
+    OIIO_DEPRECATED("clear() was never implemented. Don't bother calling it. [1.7]")
+    virtual void clear () { }
 
     /// Set an attribute controlling the image cache.  Return true
     /// if the name and type were recognized and the attrib was set.
@@ -102,6 +101,8 @@ public:
     ///     string substitute_image : uses the named image in place of all
     ///                               texture and image references.
     ///     int unassociatedalpha : if nonzero, keep unassociated alpha images
+    ///     int max_errors_per_file : Limits how many errors to issue for
+    ///                               issue for each (default: 100)
     ///
     virtual bool attribute (string_view name, TypeDesc type,
                             const void *val) = 0;
@@ -111,7 +112,19 @@ public:
     virtual bool attribute (string_view name, double val) = 0;
     virtual bool attribute (string_view name, string_view val) = 0;
 
-    /// Get the named attribute, store it in value.
+    /// Get the named attribute, store it in *val. All of the attributes
+    /// that may be set with the attribute() call may also be queried with
+    /// getattribute().
+    ///
+    /// Additionally, there are some read-only attributes that can be
+    /// queried with getattribute():
+    ///     int total_files : the total number of unique files referenced by
+    ///             calls to the ImageCache.
+    ///     string[] all_filenames : an array that will be filled with the
+    ///             list of the names of all files referenced by calls to
+    ///             the ImageCache. (The array is of ustrings or char*'s.)
+    ///     stat:* : a variety of statistics (see full docs for details).
+    ///
     virtual bool getattribute (string_view name, TypeDesc type,
                                void *val) const = 0;
     // Shortcuts for common types
@@ -345,7 +358,8 @@ public:
                      TypeDesc format, const void *buffer,
                      stride_t xstride=AutoStride, stride_t ystride=AutoStride,
                      stride_t zstride=AutoStride) = 0;
-    // DEPRECATED(1.6) -- add a tile with all channels.
+
+    OIIO_DEPRECATED("Use the version of add_tile with channel range. [1.6]")
     virtual bool add_tile (ustring filename, int subimage, int miplevel,
                      int x, int y, int z, TypeDesc format, const void *buffer,
                      stride_t xstride=AutoStride, stride_t ystride=AutoStride,

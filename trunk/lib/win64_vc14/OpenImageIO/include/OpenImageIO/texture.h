@@ -313,9 +313,8 @@ public:
     TextureSystem (void) { }
     virtual ~TextureSystem () { }
 
-    /// Close everything, free resources, start from scratch.
-    ///
-    virtual void clear () = 0;
+    OIIO_DEPRECATED("clear() was never implemented. Don't bother calling it. [1.7]")
+    virtual void clear () { }
 
     /// Set an attribute controlling the texture system.  Return true
     /// if the name and type were recognized and the attrib was set.
@@ -336,6 +335,9 @@ public:
     ///     int gray_to_rgb : make 1-channel images fill RGB lookups
     ///     int max_tile_channels : max channels to store all chans in a tile
     ///     string latlong_up : default "up" direction for latlong ("y")
+    ///     int flip_t : flip v coord for texture lookups?
+    ///     int max_errors_per_file : Limits how many errors to issue for
+    ///                               issue for each (default: 100)
     ///
     virtual bool attribute (string_view name, TypeDesc type, const void *val) = 0;
     // Shortcuts for common types
@@ -587,7 +589,8 @@ public:
     virtual bool get_texture_info (TextureHandle *texture_handle,
                           Perthread *thread_info, int subimage,
                           ustring dataname, TypeDesc datatype, void *data) = 0;
-    /// DEPRECATED (1.6.2)
+
+    OIIO_DEPRECATED("Use get_texture_info variety that is passed a Perthread*. [1.6.2]")
     virtual bool get_texture_info (TextureHandle *texture_handle, int subimage,
                           ustring dataname, TypeDesc datatype, void *data) = 0;
 

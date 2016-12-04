@@ -1,5 +1,5 @@
 OpenShadingLanguage 1.00
-# Compiled by oslc 1.7.3
+# Compiled by oslc 1.7.5
 # options: -q
 shader image	%meta{string,help,"Texture lookup"} 
 param	string	filename	""		%meta{string,help,"Texture filename"}  %read{2,2} %write{2147483647,-1}

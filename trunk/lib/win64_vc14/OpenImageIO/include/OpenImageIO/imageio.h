@@ -59,8 +59,12 @@
 #include "platform.h"
 #include "typedesc.h"   /* Needed for TypeDesc definition */
 #include "paramlist.h"
+#include "array_view.h"
 
 OIIO_NAMESPACE_BEGIN
+
+class DeepData;
+
 
 /// Type we use for stride lengths.  This is only used to designate
 /// pixel, scanline, tile, or image plane sizes in user-allocated memory,
@@ -388,77 +392,6 @@ public:
         if ((int)formats.size() < nchannels)
             formats.resize (nchannels, format);
     }
-};
-
-
-
-/// Structure to hold "deep" data -- multiple samples per pixel.
-struct OIIO_API DeepData {
-public:
-    int npixels, nchannels;
-    std::vector<TypeDesc> channeltypes;  // for each channel [c]
-    std::vector<unsigned int> nsamples;// for each pixel [z][y][x]
-    std::vector<void *> pointers;    // for each channel per pixel [z][y][x][c]
-    std::vector<char> data;          // for each sample [z][y][x][c][s]
-
-    /// Construct an empty DeepData.
-    DeepData () : npixels(0), nchannels(0) { }
-
-    /// Construct and init from an ImageSpec.
-    DeepData (const ImageSpec &spec) {init (spec); }
-
-    /// Clear the vectors and reset size to 0.
-    void clear ();
-    /// Deallocate all space in the vectors
-    void free ();
-
-    /// Initialize size and allocate nsamples, pointers. It is important to
-    /// completely fill in nsamples after init() but before alling alloc().
-    /// DEPRECATED
-    void init (int npix, int nchan,
-               const TypeDesc *chbegin, const TypeDesc *chend);
-
-    /// Initialize size and allocate nsamples, pointers based on the number
-    /// of pixels, channels, and channel types in the ImageSpec. It is
-    /// important to completely fill in nsamples after init() but before
-    /// alling alloc().
-    void init (const ImageSpec &spec);
-
-    /// Retrieve the total number of pixels.
-    int pixels () const { return npixels; }
-    /// Retrieve the number of channels.
-    int channels () const { return nchannels; }
-    /// Retrieve the channel type of channel c.
-    TypeDesc channeltype (int c) const { return channeltypes[c]; }
-
-    /// Retrieve the number of samples for the given pixel index.
-    int samples (int pixel) const;
-
-    /// Set the number of samples for the given pixel. This must be called
-    /// after init(), but before alloc().
-    void set_samples (int pixel, int samps);
-
-    /// After set_samples() has been set for all pixels, call alloc() to
-    /// allocate enough scratch space for data and set up all the pointers.
-    void alloc ();
-
-    /// Retrieve deep sample value within a pixel, cast to a float.
-    float deep_value (int pixel, int channel, int sample) const;
-    /// Retrieve deep sample value within a pixel, as an untigned int.
-    uint32_t deep_value_uint (int pixel, int channel, int sample) const;
-
-    /// Set deep sample value within a pixel, as a float.
-    /// It will automatically call alloc() if it has not yet been called.
-    void set_deep_value (int pixel, int channel, int sample, float value);
-    /// Set deep sample value within a pixel, as a uint32.
-    /// It will automatically call alloc() if it has not yet been called.
-    void set_deep_value (int pixel, int channel, int sample, uint32_t value);
-
-    /// Retrieve the pointer to the first sample of the given pixel and
-    /// channel. Return NULL if there are no samples for that pixel.
-    /// Use with care.
-    void *channel_ptr (int pixel, int channel);
-    const void *channel_ptr (int pixel, int channel) const;
 };
 
 
@@ -1306,6 +1239,9 @@ OIIO_API std::string geterror ();
 ///     int exr_threads
 ///             The size of the internal OpenEXR thread pool. The default
 ///             is to use the full available hardware concurrency detected.
+///             Default is 0 meaning to use full available hardware
+///             concurrency detected, -1 means to disable usage of the OpenEXR
+///             thread pool and execute everything in the caller thread.
 ///     string plugin_searchpath
 ///             Colon-separated list of directories to search for 
 ///             dynamically-loaded format plugins.
@@ -1326,6 +1262,11 @@ OIIO_API std::string geterror ();
 ///             The default is 0 for release builds, 1 for DEBUG builds,
 ///             but also may be overridden by the OPENIMAGEIO_DEBUG env
 ///             variable.
+///     int tiff:half
+///             When nonzero, allows TIFF to write 'half' pixel data.
+///             N.B. Most apps may not read these correctly, but OIIO will.
+///             That's why the default is not to support it.
+///
 OIIO_API bool attribute (string_view name, TypeDesc type, const void *val);
 // Shortcuts for common types
 inline bool attribute (string_view name, int val) {
@@ -1393,13 +1334,6 @@ OIIO_API void declare_imageio_format (const std::string &format_name,
 /// same as src_type.
 OIIO_API bool convert_types (TypeDesc src_type, const void *src,
                               TypeDesc dst_type, void *dst, int n);
-
-/// DEPRECATED(1.4) -- for some reason we had a convert_types that took
-/// alpha_channel and z_channel parameters, but never did anything
-/// with them.
-OIIO_API bool convert_types (TypeDesc src_type, const void *src,
-                             TypeDesc dst_type, void *dst, int n,
-                             int alpha_channel, int z_channel = -1);
 
 /// Helper routine for data conversion: Convert an image of nchannels x
 /// width x height x depth from src to dst.  The src and dst may have

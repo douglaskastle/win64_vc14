@@ -1,5 +1,5 @@
 OpenShadingLanguage 1.00
-# Compiled by oslc 1.7.3
+# Compiled by oslc 1.7.5
 # options: -q
 surface emitter	%meta{string,help,"Lambertian emitter material"} 
 param	float	power	1		%meta{string,help,"Total power of the light"}  %read{3,3} %write{2147483647,-1}

@@ -1,5 +1,5 @@
 OpenShadingLanguage 1.00
-# Compiled by oslc 1.7.3
+# Compiled by oslc 1.7.5
 # options: -q
 surface metal	%meta{string,help,"Shiny metallic material"} 
 param	float	Ks	1		%meta{string,help,"Specular scaling"} %meta{float,min,0} %meta{float,max,1}  %read{1,1} %write{2147483647,-1}
