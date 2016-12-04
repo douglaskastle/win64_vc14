@@ -34,6 +34,7 @@
 #include "export.h"
 #include "oiioversion.h"
 #include "typedesc.h"
+#include "fmath.h"
 
 
 OIIO_NAMESPACE_BEGIN
@@ -123,14 +124,19 @@ public:
     /// (or multiple images), NOT for every scanline or pixel
     /// separately!
     ColorProcessor* createColorProcessor (string_view inputColorSpace,
+                                          string_view outputColorSpace,
+                                          string_view context_key /* ="" */,
+                                          string_view context_value="") const;
+    // DEPRECATED (1.7):
+    ColorProcessor* createColorProcessor (string_view inputColorSpace,
                                           string_view outputColorSpace) const;
-    
-    /// Given the named look(s), input and output color spaces,
-    /// construct a color processor that applies an OCIO look
-    /// transformation.  If inverse==true, construct the inverse
-    /// transformation.  The context_key and context_value can
-    /// optionally be used to establish an extra token/value pair in the
-    /// OCIO context.
+
+    /// Given the named look(s), input and output color spaces, construct a
+    /// color processor that applies an OCIO look transformation.  If
+    /// inverse==true, construct the inverse transformation.  The
+    /// context_key and context_value can optionally be used to establish
+    /// extra key/value pairs in the OCIO context if they are comma-
+    /// separated lists of ontext keys and values, respectively.
     ///
     /// It is possible that this will return NULL, if one of the color
     /// spaces or the look itself doesnt exist or is not allowed.  When
@@ -175,8 +181,9 @@ public:
     /// forward/inverse transformation (and forward is assumed in the
     /// absence of either). It is possible to remove all looks from the
     /// display by passing an empty string. The context_key and context_value
-    /// can optionally be used to establish an extra token/value pair in the
-    /// OCIO context.
+    /// can optionally be used to establish extra key/value pair in the OCIO
+    /// context if they are comma-separated lists of context keys and
+    /// values, respectively.
     ///
     /// It is possible that this will return NULL, if one of the color
     /// spaces or the display or view doesn't exist or is not allowed.  When
@@ -240,17 +247,30 @@ private:
 ///    http://en.wikipedia.org/wiki/SRGB
 inline float sRGB_to_linear (float x)
 {
-    return (x <= 0.04045f) ? (x / 12.92f)
-                           : powf ((x + 0.055f) / 1.055f, 2.4f);
+    return (x <= 0.04045f) ? (x * (1.0f/12.92f))
+                           : powf ((x + 0.055f) * (1.0f / 1.055f), 2.4f);
+}
+
+inline simd::float4 sRGB_to_linear (simd::float4 x)
+{
+    return simd::select (x <= 0.04045f, x * (1.0f/12.92f),
+                         fast_pow_pos (madd (x, (1.0f / 1.055f), 0.055f*(1.0f/1.055f)), 2.4f));
 }
 
 /// Utility -- convert linear value to sRGB
 inline float linear_to_sRGB (float x)
 {
-    if (x < 0.0f)
-        return 0.0f;
     return (x <= 0.0031308f) ? (12.92f * x)
                              : (1.055f * powf (x, 1.f/2.4f) - 0.055f);
+}
+
+
+/// Utility -- convert linear value to sRGB
+inline simd::float4 linear_to_sRGB (simd::float4 x)
+{
+    // x = simd::max (x, simd::float4::Zero());
+    return simd::select (x <= 0.0031308f, 12.92f * x,
+                         madd (1.055f, fast_pow_pos (x, 1.f/2.4f),  -0.055f));
 }
 
 
@@ -259,7 +279,7 @@ inline float linear_to_sRGB (float x)
 inline float Rec709_to_linear (float x)
 {
     if (x < 0.081f)
-        return (x < 0.0f) ? 0.0f : x * (1.0f/4.5f);
+        return x * (1.0f/4.5f);
     else
         return powf ((x + 0.099f) * (1.0f/1.099f), (1.0f/0.45f));
 }
@@ -268,7 +288,7 @@ inline float Rec709_to_linear (float x)
 inline float linear_to_Rec709 (float x)
 {
     if (x < 0.018f)
-        return (x < 0.0f)? 0.0f : x * 4.5f;
+        return x * 4.5f;
     else
         return 1.099f * powf(x, 0.45f) - 0.099f;
 }

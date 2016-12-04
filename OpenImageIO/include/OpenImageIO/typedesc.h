@@ -144,7 +144,6 @@ struct OIIO_API TypeDesc {
     /// Construct from a string (e.g., "float[3]").  If no valid
     /// type could be assembled, set base to UNKNOWN.
     TypeDesc (string_view typestring);
-    TypeDesc (const char *typestring);   // DEPRECATED (1.6)
 
     /// Copy constructor.
     TypeDesc (const TypeDesc &t)
@@ -218,12 +217,20 @@ struct OIIO_API TypeDesc {
     /// integral type or something else like a string).
     bool is_floating_point () const;
 
+    /// True if it's a signed type that allows for negative values.
+    bool is_signed () const;
+
+    /// Shortcut: is it UNKNOWN?
+    bool is_unknown () const { return (basetype == UNKNOWN); }
+
+    /// if (typespec) is the same as asking whether it's not UNKNOWN.
+    operator bool () const { return (basetype != UNKNOWN); }
+
     /// Set *this to the type described in the string.  Return the
     /// length of the part of the string that describes the type.  If
     /// no valid type could be assembled, return 0 and do not modify
     /// *this.
     size_t fromstring (string_view typestring);
-    size_t fromstring (const char *typestring);   // DEPRECATED (1.6)
 
     /// Compare two TypeDesc values for equality.
     ///
