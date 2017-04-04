@@ -2207,7 +2207,7 @@ OIIO_FORCEINLINE bool reduce_and (const bool4& v) {
 #elif OIIO_SIMD_SSE
     return _mm_movemask_ps(v.simd()) == 0xf;
 #else
-    SIMD_RETURN_REDUCE (bool, true, r &= v[i]);
+    SIMD_RETURN_REDUCE (bool, true, r &= (v[i] != 0));
 #endif
 }
 
@@ -2217,7 +2217,7 @@ OIIO_FORCEINLINE bool reduce_or (const bool4& v) {
 #elif OIIO_SIMD_SSE
     return _mm_movemask_ps(v) != 0;
 #else
-    SIMD_RETURN_REDUCE (bool, false, r |= v[i]);
+    SIMD_RETURN_REDUCE (bool, false, r |= (v[i] != 0));
 #endif
 }
 
