@@ -197,7 +197,8 @@ namespace COLLADASW
             return mUpAxisType;
         }
 
-
+	protected:
+		virtual void addExtra() {}
     };
 
 } //namespace COLLADASW
