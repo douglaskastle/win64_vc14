@@ -85,12 +85,24 @@ namespace COLLADASW
         {
             OpenTag ( const String* name, ElementIndexType elementIndex ) 
 				: mName ( name )
+				, mPrefix(NULL)
 				, mElementIndex( elementIndex )
 				, mHasContents( false )
 				, mHasText ( false ) 
 			{}
 
+			OpenTag(const String* name, const String* prefix, ElementIndexType elementIndex)
+				: mName(name)
+				, mPrefix(prefix)
+				, mElementIndex(elementIndex)
+				, mHasContents(false)
+				, mHasText(false)
+			{
+
+			}
+
             const String* mName;            //!< The name of the tag
+			const String* mPrefix;			//!< The prefix of the tag
 			ElementIndexType mElementIndex; //!< the index of the open tag
             bool mHasContents;              //!< true, if contents, i.e. elements or text has been added to the element
             bool mHasText;                  //!< true, if text has been added to the element
@@ -230,6 +242,12 @@ namespace COLLADASW
         void appendValues ( int number, int number2 );
 
         /** Adds @a number to the COLLADASW file.*/
+        void appendValues(int number, int number2, int number3);
+
+		/** Adds @a number to the COLLADASW file.*/
+		void appendValues(int number, int number2, int number3, int number4);
+
+        /** Adds @a number to the COLLADASW file.*/
         void appendValues ( unsigned int number );
 
         /** Adds @a number to the COLLADASW file.*/
@@ -303,7 +321,7 @@ namespace COLLADASW
 
         /** Opens a new element with the name @a name.
         The string must persist at least until the corresponding closeElement() member is called.*/
-        TagCloser openElement ( const String& name );
+        TagCloser openElement ( const String& name, const String & prefix = String() );
 
         /** Closes the previously opened element. */
         void closeElement();
