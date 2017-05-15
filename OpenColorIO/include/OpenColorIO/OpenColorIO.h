@@ -279,6 +279,12 @@ OCIO_NAMESPACE_ENTER
         const char * getEnvironmentVarDefault(const char * name) const;
         //!cpp:function::
         void clearEnvironmentVars();
+        //!cpp:function::
+        void setEnvironmentMode(EnvironmentMode mode);
+        //!cpp:function::
+        EnvironmentMode getEnvironmentMode() const;
+        //!cpp:function::
+        void loadEnvironment();
         
         //!cpp:function::
         const char * getSearchPath() const;
@@ -726,6 +732,11 @@ OCIO_NAMESPACE_ENTER
         ConstTransformRcPtr getInverseTransform() const;
         //!cpp:function:: Setting a transform to a non-null call makes it allowed.
         void setInverseTransform(const ConstTransformRcPtr & transform);
+
+        //!cpp:function::
+        const char * getDescription() const;
+        //!cpp:function::
+        void setDescription(const char * description);
     private:
         Look();
         ~Look();
