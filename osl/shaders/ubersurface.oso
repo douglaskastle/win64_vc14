@@ -150,298 +150,298 @@ temp	closure color	$tmp38	%read{144,144} %write{143,143}
 temp	closure color	$tmp39	%read{145,145} %write{144,144}
 temp	closure color	$tmp40	%read{146,146} %write{145,145}
 code In_Normal
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:216
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:216
 #     normal In_Normal = N,
-	assign		In_Normal N 	%filename{"E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{216} %argrw{"wr"}
+	assign		In_Normal N 	%filename{"E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{216} %argrw{"wr"}
 code In_U
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:218
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:218
 #     float  In_U = u,
-	assign		In_U u 	%filename{"E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{218} %argrw{"wr"}
+	assign		In_U u 	%filename{"E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{218} %argrw{"wr"}
 code In_V
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:222
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:222
 # )
-	assign		In_V v 	%filename{"E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{222} %argrw{"wr"}
+	assign		In_V v 	%filename{"E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{222} %argrw{"wr"}
 code ___main___
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:226
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:226
 #     normal Nshading = In_Normal;
-	assign		Nshading In_Normal 	%filename{"E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{226} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:229
+	assign		Nshading In_Normal 	%filename{"E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{226} %argrw{"wr"}
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:229
 #     float opacity = 1;
 	assign		opacity $const1 	%line{229} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:230
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:230
 #     TEXTURE_EVAL(Opacity, opacity)
 	functioncall	$const2 17 	%line{230} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:106
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:106
 #     if(texfile != "")
 	neq		$tmp1 Texture_Opacity_Name $const3 	%line{106} %argrw{"wrr"}
 	if		$tmp1 17 17 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:108
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:108
 #         float u_tex = uu ;
 	assign		___308_u_tex In_U 	%line{108} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:109
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:109
 #         float v_tex = vv ;
 	assign		___308_v_tex In_V 	%line{109} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:111
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:111
 #         if(flip_u)
 	if		Texture_Opacity_Flip_U 12 12 	%line{111} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:112
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:112
 #             u_tex = 1.0 - u_tex;
 	sub		___308_u_tex $const4 ___308_u_tex 	%line{112} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:114
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:114
 #         if(flip_v)
 	if		Texture_Opacity_Flip_V 14 14 	%line{114} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:115
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:115
 #             v_tex = 1.0 - v_tex;
 	sub		___308_v_tex $const4 ___308_v_tex 	%line{115} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:117
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:117
 #         u_tex *= scale_u;
 	mul		___308_u_tex ___308_u_tex Texture_Opacity_Scale_U 	%line{117} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:118
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:118
 #         v_tex *= scale_v;
 	mul		___308_v_tex ___308_v_tex Texture_Opacity_Scale_V 	%line{118} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:120
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:120
 #         result = texture(texfile, u_tex, v_tex, "width", width, "blur", blur, "swrap", wrap, "twrap", wrap);
 	texture		opacity Texture_Opacity_Name ___308_u_tex ___308_v_tex $const5 Texture_Opacity_Width $const6 Texture_Opacity_Blur $const7 Texture_Opacity_Wrap_Mode $const8 Texture_Opacity_Wrap_Mode 	%line{120} %argrw{"wrrrrrrrrrrr"} %argderivs{2,3}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:231
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:231
 #     opacity *= Opacity;
 	mul		opacity opacity Opacity 	%line{231} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:232
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:232
 #     closure color transparencyClosure =  transparent() * (1.0-opacity);
 	closure		$tmp2 $const9 	%line{232} %argrw{"wr"}
 	sub		$tmp3 $const4 opacity 	%argrw{"wrr"}
 	mul		transparencyClosure $tmp2 $tmp3 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:235
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:235
 #     if(raytype("shadow")) {
 	raytype		$tmp4 $const10 	%line{235} %argrw{"wr"}
 	if		$tmp4 24 147 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:236
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:236
 #         Ci = transparencyClosure;
 	assign		Ci transparencyClosure 	%line{236} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:240
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:240
 #         closure color diffuseClosure	= 0;
 	assign		___310_diffuseClosure $const11 	%line{240} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:241
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:241
 #     	closure color specularClosure	= 0;
 	assign		___310_specularClosure $const11 	%line{241} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:242
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:242
 # 	closure color emissionClosure	= 0;
 	assign		___310_emissionClosure $const11 	%line{242} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:243
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:243
 #     	closure color refractionClosure = 0;
 	assign		___310_refractionClosure $const11 	%line{243} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:246
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:246
 # 	float eta = IOR;
 	assign		___310_eta IOR 	%line{246} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:247
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:247
 # 	if(backfacing()) eta = 1.0/IOR;
 	backfacing	$tmp5 	%line{247} %argrw{"w"}
 	if		$tmp5 32 32 	%argrw{"r"}
 	div		___310_eta $const4 IOR 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:250
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:250
 # 	if(Kbump) {
 	neq		$tmp6 Kbump $const12 	%line{250} %argrw{"wrr"}
 	if		$tmp6 55 55 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:251
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:251
 #             float bumpTexture = 0;
 	assign		___311_bumpTexture $const11 	%line{251} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:252
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:252
 #     	    TEXTURE_EVAL(Bump, bumpTexture)
 	functioncall	$const2 47 	%line{252} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:106
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:106
 #     if(texfile != "")
 	neq		$tmp7 Texture_Bump_Name $const3 	%line{106} %argrw{"wrr"}
 	if		$tmp7 47 47 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:108
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:108
 #         float u_tex = uu ;
 	assign		___308_u_tex In_U 	%line{108} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:109
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:109
 #         float v_tex = vv ;
 	assign		___308_v_tex In_V 	%line{109} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:111
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:111
 #         if(flip_u)
 	if		Texture_Bump_Flip_U 42 42 	%line{111} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:112
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:112
 #             u_tex = 1.0 - u_tex;
 	sub		___308_u_tex $const4 ___308_u_tex 	%line{112} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:114
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:114
 #         if(flip_v)
 	if		Texture_Bump_Flip_V 44 44 	%line{114} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:115
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:115
 #             v_tex = 1.0 - v_tex;
 	sub		___308_v_tex $const4 ___308_v_tex 	%line{115} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:117
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:117
 #         u_tex *= scale_u;
 	mul		___308_u_tex ___308_u_tex Texture_Bump_Scale_U 	%line{117} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:118
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:118
 #         v_tex *= scale_v;
 	mul		___308_v_tex ___308_v_tex Texture_Bump_Scale_V 	%line{118} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:120
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:120
 #         result = texture(texfile, u_tex, v_tex, "width", width, "blur", blur, "swrap", wrap, "twrap", wrap);
 	texture		___311_bumpTexture Texture_Bump_Name ___308_u_tex ___308_v_tex $const5 Texture_Bump_Width $const6 Texture_Bump_Blur $const7 Texture_Bump_Wrap_Mode $const8 Texture_Bump_Wrap_Mode 	%line{120} %argrw{"wrrrrrrrrrrr"} %argderivs{2,3}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:253
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:253
 #             bumpTexture *= Kbump;
 	mul		___311_bumpTexture ___311_bumpTexture Kbump 	%line{253} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:254
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:254
 #             if(bumpTexture) {
 	neq		$tmp8 ___311_bumpTexture $const12 	%line{254} %argrw{"wrr"}
 	if		$tmp8 55 55 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:255
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:255
 # 	        point Pbump = P + normalize(Nshading) * bumpTexture;
 	normalize	$tmp9 Nshading 	%line{255} %argrw{"wr"}
 	mul		$tmp10 $tmp9 ___311_bumpTexture 	%argrw{"wrr"}
 	add		___312_Pbump P $tmp10 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:256
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:256
 #                 Nshading = normalize(calculatenormal(Pbump));
 	calculatenormal	$tmp11 ___312_Pbump 	%line{256} %argrw{"wr"} %argderivs{1}
 	normalize	Nshading $tmp11 	%argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:261
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:261
 # 	if(Kd) {
 	neq		$tmp12 Kd $const12 	%line{261} %argrw{"wrr"}
 	if		$tmp12 74 74 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:262
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:262
 #             color diffuseTexture = color(1);
 	assign		___313_diffuseTexture $const13 	%line{262} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:263
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:263
 #     	    TEXTURE_EVAL(Diffuse, diffuseTexture)
 	functioncall	$const2 70 	%line{263} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
 #     if(texfile != "")
 	neq		$tmp13 Texture_Diffuse_Name $const3 	%line{83} %argrw{"wrr"}
 	if		$tmp13 70 70 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
 #         float u_tex = uu ;
 	assign		___306_u_tex In_U 	%line{85} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
 #         float v_tex = vv ;
 	assign		___306_v_tex In_V 	%line{86} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
 #         if(flip_u)
 	if		Texture_Diffuse_Flip_U 65 65 	%line{88} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
 #             u_tex = 1.0 - u_tex;
 	sub		___306_u_tex $const4 ___306_u_tex 	%line{89} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
 #         if(flip_v)
 	if		Texture_Diffuse_Flip_V 67 67 	%line{91} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
 #             v_tex = 1.0 - v_tex;
 	sub		___306_v_tex $const4 ___306_v_tex 	%line{92} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
 #         u_tex *= scale_u;
 	mul		___306_u_tex ___306_u_tex Texture_Diffuse_Scale_U 	%line{94} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
 #         v_tex *= scale_v;
 	mul		___306_v_tex ___306_v_tex Texture_Diffuse_Scale_V 	%line{95} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
 #         result = texture(texfile, u_tex, v_tex, "width", width, "blur", blur, "swrap", wrap, "twrap", wrap);
 	texture		___313_diffuseTexture Texture_Diffuse_Name ___306_u_tex ___306_v_tex $const5 Texture_Diffuse_Width $const6 Texture_Diffuse_Blur $const7 Texture_Diffuse_Wrap_Mode $const8 Texture_Diffuse_Wrap_Mode 	%line{97} %argrw{"wrrrrrrrrrrr"} %argderivs{2,3}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:264
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:264
 #             diffuseClosure = diffuse(Nshading) * Kd * Diffuse_Color * diffuseTexture;
 	closure		$tmp14 $const14 Nshading 	%line{264} %argrw{"wrr"}
 	mul		$tmp15 $tmp14 Kd 	%argrw{"wrr"}
 	mul		$tmp16 $tmp15 Diffuse_Color 	%argrw{"wrr"}
 	mul		___310_diffuseClosure $tmp16 ___313_diffuseTexture 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:268
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:268
 #         if(Ks) {
 	neq		$tmp17 Ks $const12 	%line{268} %argrw{"wrr"}
 	if		$tmp17 97 97 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:269
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:269
 #             if(Roughness <= 0.005) {
 	le		$tmp18 Roughness $const15 	%line{269} %argrw{"wrr"}
 	if		$tmp18 79 81 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:270
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:270
 # 	        specularClosure = reflection(Nshading, eta);
 	closure		___310_specularClosure $const16 Nshading ___310_eta 	%line{270} %argrw{"wrrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:272
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:272
 #         	specularClosure = microfacet("beckmann", Nshading, Roughness, eta, 0);
 	functioncall	$const18 81 	%line{272} %argrw{"r"}
-# E:/db2\\S\\VS1464R\\build\\osl\\src\\external_osl-build\\src\\shaders\\stdosl.h:515
+# E:/db3\\blender_dependencies.git\\trunk\\S\\VS1464R\\build\\osl\\src\\external_osl-build\\src\\shaders\\stdosl.h:515
 # point  transform (string to, point p)  { return transform("common",to,p); }
-	closure		___310_specularClosure $const18 $const17 Nshading $const19 Roughness Roughness ___310_eta $const11 	%filename{"E:/db2\\S\\VS1464R\\build\\osl\\src\\external_osl-build\\src\\shaders\\stdosl.h"} %line{515} %argrw{"wrrrrrrrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:275
+	closure		___310_specularClosure $const18 $const17 Nshading $const19 Roughness Roughness ___310_eta $const11 	%filename{"E:/db3\\blender_dependencies.git\\trunk\\S\\VS1464R\\build\\osl\\src\\external_osl-build\\src\\shaders\\stdosl.h"} %line{515} %argrw{"wrrrrrrrr"}
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:275
 #     	    color specularTexture = color(1);
-	assign		___314_specularTexture $const13 	%filename{"E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{275} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:276
+	assign		___314_specularTexture $const13 	%filename{"E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl"} %line{275} %argrw{"wr"}
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:276
 #             TEXTURE_EVAL(Specular, specularTexture)
 	functioncall	$const2 94 	%line{276} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
 #     if(texfile != "")
 	neq		$tmp20 Texture_Specular_Name $const3 	%line{83} %argrw{"wrr"}
 	if		$tmp20 94 94 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
 #         float u_tex = uu ;
 	assign		___306_u_tex In_U 	%line{85} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
 #         float v_tex = vv ;
 	assign		___306_v_tex In_V 	%line{86} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
 #         if(flip_u)
 	if		Texture_Specular_Flip_U 89 89 	%line{88} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
 #             u_tex = 1.0 - u_tex;
 	sub		___306_u_tex $const4 ___306_u_tex 	%line{89} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
 #         if(flip_v)
 	if		Texture_Specular_Flip_V 91 91 	%line{91} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
 #             v_tex = 1.0 - v_tex;
 	sub		___306_v_tex $const4 ___306_v_tex 	%line{92} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
 #         u_tex *= scale_u;
 	mul		___306_u_tex ___306_u_tex Texture_Specular_Scale_U 	%line{94} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
 #         v_tex *= scale_v;
 	mul		___306_v_tex ___306_v_tex Texture_Specular_Scale_V 	%line{95} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
 #         result = texture(texfile, u_tex, v_tex, "width", width, "blur", blur, "swrap", wrap, "twrap", wrap);
 	texture		___314_specularTexture Texture_Specular_Name ___306_u_tex ___306_v_tex $const5 Texture_Specular_Width $const6 Texture_Specular_Blur $const7 Texture_Specular_Wrap_Mode $const8 Texture_Specular_Wrap_Mode 	%line{97} %argrw{"wrrrrrrrrrrr"} %argderivs{2,3}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:277
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:277
 # 	    specularClosure *= specularTexture * Ks * Specular_Color;
 	mul		$tmp21 ___314_specularTexture Ks 	%line{277} %argrw{"wrr"}
 	mul		$tmp22 $tmp21 Specular_Color 	%argrw{"wrr"}
 	mul		___310_specularClosure ___310_specularClosure $tmp22 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:281
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:281
 # 	if(Ke) {
 	neq		$tmp23 Ke $const12 	%line{281} %argrw{"wrr"}
 	if		$tmp23 118 118 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:290
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:290
 # 	    color emissionTexture = color(1);
 	assign		___317_emissionTexture $const13 	%line{290} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:291
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:291
 #     	    TEXTURE_EVAL(Emission, emissionTexture)
 	functioncall	$const2 112 	%line{291} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
 #     if(texfile != "")
 	neq		$tmp24 Texture_Emission_Name $const3 	%line{83} %argrw{"wrr"}
 	if		$tmp24 112 112 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
 #         float u_tex = uu ;
 	assign		___306_u_tex In_U 	%line{85} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
 #         float v_tex = vv ;
 	assign		___306_v_tex In_V 	%line{86} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
 #         if(flip_u)
 	if		Texture_Emission_Flip_U 107 107 	%line{88} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
 #             u_tex = 1.0 - u_tex;
 	sub		___306_u_tex $const4 ___306_u_tex 	%line{89} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
 #         if(flip_v)
 	if		Texture_Emission_Flip_V 109 109 	%line{91} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
 #             v_tex = 1.0 - v_tex;
 	sub		___306_v_tex $const4 ___306_v_tex 	%line{92} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
 #         u_tex *= scale_u;
 	mul		___306_u_tex ___306_u_tex Texture_Emission_Scale_U 	%line{94} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
 #         v_tex *= scale_v;
 	mul		___306_v_tex ___306_v_tex Texture_Emission_Scale_V 	%line{95} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
 #         result = texture(texfile, u_tex, v_tex, "width", width, "blur", blur, "swrap", wrap, "twrap", wrap);
 	texture		___317_emissionTexture Texture_Emission_Name ___306_u_tex ___306_v_tex $const5 Texture_Emission_Width $const6 Texture_Emission_Blur $const7 Texture_Emission_Wrap_Mode $const8 Texture_Emission_Wrap_Mode 	%line{97} %argrw{"wrrrrrrrrrrr"} %argderivs{2,3}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:292
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:292
 # 	    emissionClosure = emission() * (Ke / surfacearea()) * Emission_Color * emissionTexture;
 	closure		$tmp25 $const20 	%line{292} %argrw{"wr"}
 	surfacearea	$tmp26 	%argrw{"w"}
@@ -449,67 +449,67 @@ code ___main___
 	mul		$tmp28 $tmp25 $tmp27 	%argrw{"wrr"}
 	mul		$tmp29 $tmp28 Emission_Color 	%argrw{"wrr"}
 	mul		___310_emissionClosure $tmp29 ___317_emissionTexture 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:296
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:296
 #     	if(Kt) {
 	neq		$tmp30 Kt $const12 	%line{296} %argrw{"wrr"}
 	if		$tmp30 142 142 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:297
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:297
 # 	    if(Roughness <= 0.005) {
 	le		$tmp31 Roughness $const15 	%line{297} %argrw{"wrr"}
 	if		$tmp31 123 124 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:298
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:298
 #                 refractionClosure = refraction(Nshading, eta, "absorption", Absorption_Color);
 	closure		___310_refractionClosure $const22 Nshading ___310_eta $const21 Absorption_Color 	%line{298} %argrw{"wrrrrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:300
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:300
 #                 refractionClosure = microfacet("beckmann", Nshading, vector(0), Roughness, Roughness,  eta, 1, "absorption", Absorption_Color);
 	closure		___310_refractionClosure $const18 $const17 Nshading $const19 Roughness Roughness ___310_eta $const1 $const21 Absorption_Color 	%line{300} %argrw{"wrrrrrrrrrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:303
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:303
 # 	    color refractionTexture = color(1);
 	assign		___318_refractionTexture $const13 	%line{303} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:304
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:304
 #     	    TEXTURE_EVAL(Refraction, refractionTexture)
 	functioncall	$const2 137 	%line{304} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:83
 #     if(texfile != "")
 	neq		$tmp33 Texture_Refraction_Name $const3 	%line{83} %argrw{"wrr"}
 	if		$tmp33 137 137 	%argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:85
 #         float u_tex = uu ;
 	assign		___306_u_tex In_U 	%line{85} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:86
 #         float v_tex = vv ;
 	assign		___306_v_tex In_V 	%line{86} %argrw{"wr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:88
 #         if(flip_u)
 	if		Texture_Refraction_Flip_U 132 132 	%line{88} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:89
 #             u_tex = 1.0 - u_tex;
 	sub		___306_u_tex $const4 ___306_u_tex 	%line{89} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:91
 #         if(flip_v)
 	if		Texture_Refraction_Flip_V 134 134 	%line{91} %argrw{"r"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:92
 #             v_tex = 1.0 - v_tex;
 	sub		___306_v_tex $const4 ___306_v_tex 	%line{92} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:94
 #         u_tex *= scale_u;
 	mul		___306_u_tex ___306_u_tex Texture_Refraction_Scale_U 	%line{94} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:95
 #         v_tex *= scale_v;
 	mul		___306_v_tex ___306_v_tex Texture_Refraction_Scale_V 	%line{95} %argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:97
 #         result = texture(texfile, u_tex, v_tex, "width", width, "blur", blur, "swrap", wrap, "twrap", wrap);
 	texture		___318_refractionTexture Texture_Refraction_Name ___306_u_tex ___306_v_tex $const5 Texture_Refraction_Width $const6 Texture_Refraction_Blur $const7 Texture_Refraction_Wrap_Mode $const8 Texture_Refraction_Wrap_Mode 	%line{97} %argrw{"wrrrrrrrrrrr"} %argderivs{2,3}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:305
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:305
 # 	    refractionClosure *= refractionTexture * Kt * Refraction_Color;
 	mul		$tmp34 ___318_refractionTexture Kt 	%line{305} %argrw{"wrr"}
 	mul		$tmp35 $tmp34 Refraction_Color 	%argrw{"wrr"}
 	mul		___310_refractionClosure ___310_refractionClosure $tmp35 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:307
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:307
 # 	    diffuseClosure *= 1.0-Kt;
 	sub		$tmp36 $const4 Kt 	%line{307} %argrw{"wrr"}
 	mul		___310_diffuseClosure ___310_diffuseClosure $tmp36 	%argrw{"wrr"}
-# E:/db2/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:311
+# E:/db3/blender_dependencies.git/trunk/S/VS1464R/build/osl/src/external_osl/src/shaders/ubersurface.osl:311
 #     	Ci = ((diffuseClosure + specularClosure + emissionClosure + refractionClosure) * opacity) + transparencyClosure;
 	add		$tmp37 ___310_diffuseClosure ___310_specularClosure 	%line{311} %argrw{"wrr"}
 	add		$tmp38 $tmp37 ___310_emissionClosure 	%argrw{"wrr"}
