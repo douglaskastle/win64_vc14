@@ -22,8 +22,8 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#ifndef OPENSUBDIV3_OSD_CPU_EVALUATOR_H
-#define OPENSUBDIV3_OSD_CPU_EVALUATOR_H
+#ifndef OPENSUBDIV3_OSD_TBB_EVALUATOR_H
+#define OPENSUBDIV3_OSD_TBB_EVALUATOR_H
 
 #include "../version.h"
 #include "../osd/bufferDescriptor.h"
@@ -36,7 +36,7 @@ namespace OPENSUBDIV_VERSION {
 
 namespace Osd {
 
-class CpuEvaluator {
+class TbbEvaluator {
 public:
     /// ----------------------------------------------------------------------
     ///
@@ -62,19 +62,19 @@ public:
     ///
     /// @param stencilTable   Far::StencilTable or equivalent
     ///
-    /// @param instance       not used in the cpu kernel
+    /// @param instance       not used in the tbb kernel
     ///                       (declared as a typed pointer to prevent
     ///                        undesirable template resolution)
     ///
-    /// @param deviceContext  not used in the cpu kernel
+    /// @param deviceContext  not used in the tbb kernel
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER, typename STENCIL_TABLE>
     static bool EvalStencils(
         SRC_BUFFER *srcBuffer, BufferDescriptor const &srcDesc,
         DST_BUFFER *dstBuffer, BufferDescriptor const &dstDesc,
         STENCIL_TABLE const *stencilTable,
-        const CpuEvaluator *instance = NULL,
-        void * deviceContext = NULL) {
+        TbbEvaluator const *instance = NULL,
+        void *deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
@@ -158,11 +158,11 @@ public:
     ///
     /// @param stencilTable   Far::StencilTable or equivalent
     ///
-    /// @param instance       not used in the cpu kernel
+    /// @param instance       not used in the tbb kernel
     ///                       (declared as a typed pointer to prevent
     ///                        undesirable template resolution)
     ///
-    /// @param deviceContext  not used in the cpu kernel
+    /// @param deviceContext  not used in the tbb kernel
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER, typename STENCIL_TABLE>
     static bool EvalStencils(
@@ -171,7 +171,7 @@ public:
         DST_BUFFER *duBuffer,  BufferDescriptor const &duDesc,
         DST_BUFFER *dvBuffer,  BufferDescriptor const &dvDesc,
         STENCIL_TABLE const *stencilTable,
-        const CpuEvaluator *instance = NULL,
+        const TbbEvaluator *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -293,11 +293,11 @@ public:
     ///
     /// @param stencilTable   Far::StencilTable or equivalent
     ///
-    /// @param instance       not used in the cpu kernel
+    /// @param instance       not used in the tbb kernel
     ///                       (declared as a typed pointer to prevent
     ///                        undesirable template resolution)
     ///
-    /// @param deviceContext  not used in the cpu kernel
+    /// @param deviceContext  not used in the tbb kernel
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER, typename STENCIL_TABLE>
     static bool EvalStencils(
@@ -309,7 +309,7 @@ public:
         DST_BUFFER *duvBuffer, BufferDescriptor const &duvDesc,
         DST_BUFFER *dvvBuffer, BufferDescriptor const &dvvDesc,
         STENCIL_TABLE const *stencilTable,
-        const CpuEvaluator *instance = NULL,
+        const TbbEvaluator *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -457,7 +457,7 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -522,7 +522,7 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -615,7 +615,7 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -826,7 +826,7 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -891,7 +891,7 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -979,7 +979,7 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -1038,7 +1038,7 @@ public:
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
         int fvarChannel,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -1106,7 +1106,7 @@ public:
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
         int fvarChannel,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -1197,7 +1197,7 @@ public:
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
         int fvarChannel,
-        CpuEvaluator const *instance = NULL,
+        TbbEvaluator const *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
@@ -1224,9 +1224,14 @@ public:
     /// ----------------------------------------------------------------------
 
     /// \brief synchronize all asynchronous computation invoked on this device.
-    static void Synchronize(void * /*deviceContext = NULL*/) {
-        // nothing.
-    }
+    static void Synchronize(void *deviceContext = NULL);
+
+    /// \brief initialize tbb task schedular
+    ///        (optional: client may use tbb::task_scheduler_init)
+    ///
+    /// @param numThreads      how many threads
+    ///
+    static void SetNumThreads(int numThreads);
 };
 
 
@@ -1238,4 +1243,4 @@ using namespace OPENSUBDIV_VERSION;
 }  // end namespace OpenSubdiv
 
 
-#endif  // OPENSUBDIV3_OSD_CPU_EVALUATOR_H
+#endif  // OPENSUBDIV3_OSD_TBB_EVALUATOR_H
