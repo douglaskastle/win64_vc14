@@ -16,7 +16,7 @@ set(CMAKE_IMPORT_FILE_VERSION 1)
 set(_targetsDefined)
 set(_targetsNotDefined)
 set(_expectedTargets)
-foreach(_expectedTarget openjpeg j2k_to_image image_to_j2k j2k_dump)
+foreach(_expectedTarget openjp2 opj_decompress opj_compress opj_dump)
   list(APPEND _expectedTargets ${_expectedTarget})
   if(NOT TARGET ${_expectedTarget})
     list(APPEND _targetsNotDefined ${_expectedTarget})
@@ -49,17 +49,17 @@ if(_IMPORT_PREFIX STREQUAL "/")
   set(_IMPORT_PREFIX "")
 endif()
 
-# Create imported target openjpeg
-add_library(openjpeg STATIC IMPORTED)
+# Create imported target openjp2
+add_library(openjp2 STATIC IMPORTED)
 
-# Create imported target j2k_to_image
-add_executable(j2k_to_image IMPORTED)
+# Create imported target opj_decompress
+add_executable(opj_decompress IMPORTED)
 
-# Create imported target image_to_j2k
-add_executable(image_to_j2k IMPORTED)
+# Create imported target opj_compress
+add_executable(opj_compress IMPORTED)
 
-# Create imported target j2k_dump
-add_executable(j2k_dump IMPORTED)
+# Create imported target opj_dump
+add_executable(opj_dump IMPORTED)
 
 # Load information for each installed configuration.
 get_filename_component(_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
