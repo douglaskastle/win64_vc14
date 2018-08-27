@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2016 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2018 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -19,8 +19,8 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef _SDL_config_h
-#define _SDL_config_h
+#ifndef SDL_config_h_
+#define SDL_config_h_
 
 /**
  *  \file SDL_config.h.in
@@ -47,40 +47,32 @@
 /* #undef HAVE_GCC_ATOMICS */
 /* #undef HAVE_GCC_SYNC_LOCK_TEST_AND_SET */
 
-#define HAVE_D3D_H 1
-#define HAVE_D3D11_H 1
-#define HAVE_DDRAW_H 1
-#define HAVE_DSOUND_H 1
-#define HAVE_DINPUT_H 1
-/* #undef HAVE_XAUDIO2_H */
-#define HAVE_XINPUT_H 1
-#define HAVE_DXGI_H 1
-
 /* Comment this if you want to build without any C library requirements */
 /* #undef HAVE_LIBC */
 #if HAVE_LIBC
 
 /* Useful headers */
-/* #undef HAVE_ALLOCA_H */
-/* #undef HAVE_SYS_TYPES_H */
-/* #undef HAVE_STDIO_H */
 /* #undef STDC_HEADERS */
-/* #undef HAVE_STDLIB_H */
-#define HAVE_STDARG_H 1
-/* #undef HAVE_MALLOC_H */
-/* #undef HAVE_MEMORY_H */
-/* #undef HAVE_STRING_H */
-/* #undef HAVE_STRINGS_H */
-/* #undef HAVE_INTTYPES_H */
-/* #undef HAVE_STDINT_H */
+/* #undef HAVE_ALLOCA_H */
 /* #undef HAVE_CTYPE_H */
-/* #undef HAVE_MATH_H */
+/* #undef HAVE_FLOAT_H */
 /* #undef HAVE_ICONV_H */
+/* #undef HAVE_INTTYPES_H */
+/* #undef HAVE_LIMITS_H */
+/* #undef HAVE_MALLOC_H */
+/* #undef HAVE_MATH_H */
+/* #undef HAVE_MEMORY_H */
 /* #undef HAVE_SIGNAL_H */
-/* #undef HAVE_ALTIVEC_H */
+#define HAVE_STDARG_H 1
+/* #undef HAVE_STDINT_H */
+/* #undef HAVE_STDIO_H */
+/* #undef HAVE_STDLIB_H */
+/* #undef HAVE_STRINGS_H */
+/* #undef HAVE_STRING_H */
+/* #undef HAVE_SYS_TYPES_H */
+/* #undef HAVE_WCHAR_H */
 /* #undef HAVE_PTHREAD_NP_H */
-/* #undef HAVE_LIBUDEV_H */
-/* #undef HAVE_DBUS_DBUS_H */
+/* #undef HAVE_LIBUNWIND_H */
 
 /* C library functions */
 /* #undef HAVE_MALLOC */
@@ -101,10 +93,13 @@
 /* #undef HAVE_MEMCPY */
 /* #undef HAVE_MEMMOVE */
 /* #undef HAVE_MEMCMP */
+/* #undef HAVE_WCSLEN */
+/* #undef HAVE_WCSLCPY */
+/* #undef HAVE_WCSLCAT */
+/* #undef HAVE_WCSCMP */
 /* #undef HAVE_STRLEN */
 /* #undef HAVE_STRLCPY */
 /* #undef HAVE_STRLCAT */
-/* #undef HAVE_STRDUP */
 /* #undef HAVE__STRREV */
 /* #undef HAVE__STRUPR */
 /* #undef HAVE__STRLWR */
@@ -135,25 +130,41 @@
 /* #undef HAVE_VSSCANF */
 /* #undef HAVE_VSNPRINTF */
 /* #undef HAVE_M_PI */
-/* #undef HAVE_ATAN */
-/* #undef HAVE_ATAN2 */
 /* #undef HAVE_ACOS */
+/* #undef HAVE_ACOSF */
 /* #undef HAVE_ASIN */
+/* #undef HAVE_ASINF */
+/* #undef HAVE_ATAN */
+/* #undef HAVE_ATANF */
+/* #undef HAVE_ATAN2 */
+/* #undef HAVE_ATAN2F */
 /* #undef HAVE_CEIL */
+/* #undef HAVE_CEILF */
 /* #undef HAVE_COPYSIGN */
+/* #undef HAVE_COPYSIGNF */
 /* #undef HAVE_COS */
 /* #undef HAVE_COSF */
 /* #undef HAVE_FABS */
+/* #undef HAVE_FABSF */
 /* #undef HAVE_FLOOR */
+/* #undef HAVE_FLOORF */
+/* #undef HAVE_FMOD */
+/* #undef HAVE_FMODF */
 /* #undef HAVE_LOG */
+/* #undef HAVE_LOGF */
+/* #undef HAVE_LOG10 */
+/* #undef HAVE_LOG10F */
 /* #undef HAVE_POW */
+/* #undef HAVE_POWF */
 /* #undef HAVE_SCALBN */
+/* #undef HAVE_SCALBNF */
 /* #undef HAVE_SIN */
 /* #undef HAVE_SINF */
 /* #undef HAVE_SQRT */
 /* #undef HAVE_SQRTF */
 /* #undef HAVE_TAN */
 /* #undef HAVE_TANF */
+/* #undef HAVE_FOPEN64 */
 /* #undef HAVE_FSEEKO */
 /* #undef HAVE_FSEEKO64 */
 /* #undef HAVE_SIGACTION */
@@ -169,13 +180,35 @@
 /* #undef HAVE_PTHREAD_SETNAME_NP */
 /* #undef HAVE_PTHREAD_SET_NAME_NP */
 /* #undef HAVE_SEM_TIMEDWAIT */
+/* #undef HAVE_GETAUXVAL */
+/* #undef HAVE_POLL */
+
 #elif __WIN32__
 #define HAVE_STDARG_H 1
 #define HAVE_STDDEF_H 1
+/* #undef HAVE_FLOAT_H */
 #else
 /* We may need some replacement for stdarg.h here */
 #include <stdarg.h>
 #endif /* HAVE_LIBC */
+
+/* #undef HAVE_ALTIVEC_H */
+/* #undef HAVE_DBUS_DBUS_H */
+/* #undef HAVE_FCITX_FRONTEND_H */
+/* #undef HAVE_IBUS_IBUS_H */
+/* #undef HAVE_IMMINTRIN_H */
+/* #undef HAVE_LIBSAMPLERATE_H */
+/* #undef HAVE_LIBUDEV_H */
+
+#define HAVE_D3D_H 1
+#define HAVE_D3D11_H 1
+#define HAVE_DDRAW_H 1
+#define HAVE_DSOUND_H 1
+#define HAVE_DINPUT_H 1
+#define HAVE_XINPUT_H 1
+#define HAVE_DXGI_H 1
+/* #undef HAVE_XINPUT_GAMEPAD_EX */
+/* #undef HAVE_XINPUT_STATE_EX */
 
 /* SDL internal assertion support */
 /* #undef SDL_DEFAULT_ASSERT_LEVEL */
@@ -197,35 +230,37 @@
 /* #undef SDL_FILESYSTEM_DISABLED */
 
 /* Enable various audio drivers */
-/* #undef SDL_AUDIO_DRIVER_ANDROID */
 /* #undef SDL_AUDIO_DRIVER_ALSA */
 /* #undef SDL_AUDIO_DRIVER_ALSA_DYNAMIC */
+/* #undef SDL_AUDIO_DRIVER_ANDROID */
 /* #undef SDL_AUDIO_DRIVER_ARTS */
 /* #undef SDL_AUDIO_DRIVER_ARTS_DYNAMIC */
-/* #undef SDL_AUDIO_DRIVER_PULSEAUDIO */
-/* #undef SDL_AUDIO_DRIVER_PULSEAUDIO_DYNAMIC */
-/* #undef SDL_AUDIO_DRIVER_HAIKU */
-/* #undef SDL_AUDIO_DRIVER_BSD */
 /* #undef SDL_AUDIO_DRIVER_COREAUDIO */
 #define SDL_AUDIO_DRIVER_DISK 1
-#define SDL_AUDIO_DRIVER_DUMMY 1
-/* #undef SDL_AUDIO_DRIVER_XAUDIO2 */
 #define SDL_AUDIO_DRIVER_DSOUND 1
+#define SDL_AUDIO_DRIVER_DUMMY 1
+/* #undef SDL_AUDIO_DRIVER_EMSCRIPTEN */
 /* #undef SDL_AUDIO_DRIVER_ESD */
 /* #undef SDL_AUDIO_DRIVER_ESD_DYNAMIC */
+/* #undef SDL_AUDIO_DRIVER_FUSIONSOUND */
+/* #undef SDL_AUDIO_DRIVER_FUSIONSOUND_DYNAMIC */
+/* #undef SDL_AUDIO_DRIVER_HAIKU */
+/* #undef SDL_AUDIO_DRIVER_JACK */
+/* #undef SDL_AUDIO_DRIVER_JACK_DYNAMIC */
 /* #undef SDL_AUDIO_DRIVER_NAS */
 /* #undef SDL_AUDIO_DRIVER_NAS_DYNAMIC */
-/* #undef SDL_AUDIO_DRIVER_SNDIO */
-/* #undef SDL_AUDIO_DRIVER_SNDIO_DYNAMIC */
+/* #undef SDL_AUDIO_DRIVER_NETBSD */
 /* #undef SDL_AUDIO_DRIVER_OSS */
 /* #undef SDL_AUDIO_DRIVER_OSS_SOUNDCARD_H */
 /* #undef SDL_AUDIO_DRIVER_PAUDIO */
+/* #undef SDL_AUDIO_DRIVER_PULSEAUDIO */
+/* #undef SDL_AUDIO_DRIVER_PULSEAUDIO_DYNAMIC */
 /* #undef SDL_AUDIO_DRIVER_QSA */
+/* #undef SDL_AUDIO_DRIVER_SNDIO */
+/* #undef SDL_AUDIO_DRIVER_SNDIO_DYNAMIC */
 /* #undef SDL_AUDIO_DRIVER_SUNAUDIO */
+#define SDL_AUDIO_DRIVER_WASAPI 1
 #define SDL_AUDIO_DRIVER_WINMM 1
-/* #undef SDL_AUDIO_DRIVER_FUSIONSOUND */
-/* #undef SDL_AUDIO_DRIVER_FUSIONSOUND_DYNAMIC */
-/* #undef SDL_AUDIO_DRIVER_EMSCRIPTEN */
 
 /* Enable various input drivers */
 /* #undef SDL_INPUT_LINUXEV */
@@ -248,9 +283,9 @@
 /* #undef SDL_HAPTIC_IOKIT */
 #define SDL_HAPTIC_DINPUT 1
 #define SDL_HAPTIC_XINPUT 1
+/* #undef SDL_HAPTIC_ANDROID */
 
 /* Enable various shared object loading systems */
-/* #undef SDL_LOADSO_HAIKU */
 /* #undef SDL_LOADSO_DLOPEN */
 /* #undef SDL_LOADSO_DUMMY */
 /* #undef SDL_LOADSO_LDG */
@@ -281,6 +316,10 @@
 /* #undef SDL_VIDEO_DRIVER_RPI */
 /* #undef SDL_VIDEO_DRIVER_VIVANTE */
 /* #undef SDL_VIDEO_DRIVER_VIVANTE_VDK */
+
+/* #undef SDL_VIDEO_DRIVER_KMSDRM */
+/* #undef SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC */
+/* #undef SDL_VIDEO_DRIVER_KMSDRM_DYNAMIC_GBM */
 
 /* #undef SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH */
 /* #undef SDL_VIDEO_DRIVER_WAYLAND_DYNAMIC */
@@ -320,6 +359,7 @@
 /* #undef SDL_VIDEO_RENDER_OGL_ES */
 #define SDL_VIDEO_RENDER_OGL_ES2 1
 /* #undef SDL_VIDEO_RENDER_DIRECTFB */
+/* #undef SDL_VIDEO_RENDER_METAL */
 
 /* Enable OpenGL support */
 #define SDL_VIDEO_OPENGL 1
@@ -332,6 +372,9 @@
 #define SDL_VIDEO_OPENGL_EGL 1
 /* #undef SDL_VIDEO_OPENGL_OSMESA */
 /* #undef SDL_VIDEO_OPENGL_OSMESA_DYNAMIC */
+
+/* Enable Vulkan support */
+#define SDL_VIDEO_VULKAN 1
 
 /* Enable system power support */
 /* #undef SDL_POWER_ANDROID */
@@ -355,6 +398,8 @@
 #define SDL_ASSEMBLY_ROUTINES 1
 /* #undef SDL_ALTIVEC_BLITTERS */
 
+/* Enable dynamic libsamplerate support */
+/* #undef SDL_LIBSAMPLERATE_DYNAMIC */
 
 /* Platform specific definitions */
 #if !defined(__WIN32__)
@@ -416,4 +461,4 @@ typedef unsigned int uintptr_t;
 #  endif /* !_STDINT_H_ && !HAVE_STDINT_H */
 #endif /* __WIN32__ */
 
-#endif /* _SDL_config_h */
+#endif /* SDL_config_h_ */
