@@ -22,41 +22,37 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#ifndef OPENSUBDIV3_OSD_CPU_GL_VERTEX_BUFFER_H
-#define OPENSUBDIV3_OSD_CPU_GL_VERTEX_BUFFER_H
+#ifndef OPENSUBDIV3_OSD_CUDA_VERTEX_BUFFER_H
+#define OPENSUBDIV3_OSD_CUDA_VERTEX_BUFFER_H
 
 #include "../version.h"
 
 #include <cstddef>
-#include "../osd/opengl.h"
 
 namespace OpenSubdiv {
 namespace OPENSUBDIV_VERSION {
 
 namespace Osd {
 
+/// \brief Concrete vertex buffer class for Cuda subdivision.
 ///
-/// \brief Concrete vertex buffer class for cpu subdivision and OpenGL drawing.
+/// CudaVertexBuffer implements CudaVertexBufferInterface.
+/// An instance of this buffer class can be passed to CudaEvaluator
 ///
-/// CpuGLVertexBuffer implements CpuVertexBufferInterface and
-/// GLVertexBufferInterface.
-///
-/// The buffer interop between Cpu and GL is handled automatically when a
-/// client calls BindCpuBuffer and BindVBO methods.
-///
-class CpuGLVertexBuffer {
+class CudaVertexBuffer {
+
 public:
     /// Creator. Returns NULL if error.
-    static CpuGLVertexBuffer * Create(int numElements, int numVertices,
-                                      void *deviceContext = NULL);
+    static CudaVertexBuffer * Create(int numElements, int numVertices,
+                                     void *deviceContext = NULL);
 
     /// Destructor.
-    ~CpuGLVertexBuffer();
+    ~CudaVertexBuffer();
 
-    /// This method is meant to be used in client code in order to provide
-    /// coarse vertices data to Osd.
+    /// This method is meant to be used in client code in order to provide coarse
+    /// vertices data to Osd.
     void UpdateData(const float *src, int startVertex, int numVertices,
-                    void *deviceContext = NULL);
+                    void *deviceContext=NULL);
 
     /// Returns how many elements defined in this vertex buffer.
     int GetNumElements() const;
@@ -64,27 +60,22 @@ public:
     /// Returns how many vertices allocated in this vertex buffer.
     int GetNumVertices() const;
 
-    /// Returns cpu memory. GL buffer will be mapped to cpu address
-    /// if necessary.
-    float * BindCpuBuffer();
-
-    /// Returns the name of GL buffer object. If the buffer is mapped
-    /// to cpu address, it will be unmapped back to GL.
-    GLuint BindVBO(void *deviceContext = NULL);
+    /// Returns cuda memory.
+    float * BindCudaBuffer();
 
 protected:
     /// Constructor.
-    CpuGLVertexBuffer(int numElements, int numVertices);
+    CudaVertexBuffer(int numElements, int numVertices);
 
-    /// Allocates VBO for this buffer. Returns true if success.
+    /// Allocates Cuda memory for this buffer.
+    /// Returns true if success.
     bool allocate();
 
 private:
     int _numElements;
     int _numVertices;
-    GLuint _vbo;
-    float *_cpuBuffer;
-    bool _dataDirty;
+    void *_cudaMem;
+
 };
 
 }  // end namespace Osd
@@ -94,4 +85,4 @@ using namespace OPENSUBDIV_VERSION;
 
 }  // end namespace OpenSubdiv
 
-#endif  // OPENSUBDIV3_OSD_CPU_GL_VERTEX_BUFFER_H
+#endif  // OPENSUBDIV3_OSD_CUDA_VERTEX_BUFFER_H

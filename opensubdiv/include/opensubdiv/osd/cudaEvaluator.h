@@ -22,21 +22,76 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#ifndef OPENSUBDIV3_OSD_CPU_EVALUATOR_H
-#define OPENSUBDIV3_OSD_CPU_EVALUATOR_H
+#ifndef OPENSUBDIV3_OSD_CUDA_EVALUATOR_H
+#define OPENSUBDIV3_OSD_CUDA_EVALUATOR_H
 
 #include "../version.h"
+
+#include <vector>
 #include "../osd/bufferDescriptor.h"
 #include "../osd/types.h"
-
-#include <cstddef>
 
 namespace OpenSubdiv {
 namespace OPENSUBDIV_VERSION {
 
+namespace Far {
+    class PatchTable;
+    class StencilTable;
+    class LimitStencilTable;
+}
+
 namespace Osd {
 
-class CpuEvaluator {
+/// \brief CUDA stencil table
+///
+/// This class is a cuda buffer representation of Far::StencilTable.
+///
+/// CudaEvaluator consumes this table to apply stencils
+///
+///
+class CudaStencilTable {
+public:
+    static CudaStencilTable *Create(Far::StencilTable const *stencilTable,
+                                    void *deviceContext = NULL) {
+        (void)deviceContext;  // unused
+        return new CudaStencilTable(stencilTable);
+    }
+    static CudaStencilTable *Create(Far::LimitStencilTable const *limitStencilTable,
+                                    void *deviceContext = NULL) {
+        (void)deviceContext;  // unused
+        return new CudaStencilTable(limitStencilTable);
+    }
+
+    explicit CudaStencilTable(Far::StencilTable const *stencilTable);
+    explicit CudaStencilTable(Far::LimitStencilTable const *limitStencilTable);
+    ~CudaStencilTable();
+
+    // interfaces needed for CudaCompute
+    void *GetSizesBuffer() const { return _sizes; }
+    void *GetOffsetsBuffer() const { return _offsets; }
+    void *GetIndicesBuffer() const { return _indices; }
+    void *GetWeightsBuffer() const { return _weights; }
+    void *GetDuWeightsBuffer() const { return _duWeights; }
+    void *GetDvWeightsBuffer() const { return _dvWeights; }
+    void *GetDuuWeightsBuffer() const { return _duuWeights; }
+    void *GetDuvWeightsBuffer() const { return _duvWeights; }
+    void *GetDvvWeightsBuffer() const { return _dvvWeights; }
+    int GetNumStencils() const { return _numStencils; }
+
+private:
+    void * _sizes,
+         * _offsets,
+         * _indices,
+         * _weights,
+         * _duWeights,
+         * _dvWeights,
+         * _duuWeights,
+         * _duvWeights,
+         * _dvvWeights;
+    int _numStencils;
+};
+
+class CudaEvaluator {
 public:
     /// ----------------------------------------------------------------------
     ///
@@ -44,55 +99,50 @@ public:
     ///
     /// ----------------------------------------------------------------------
 
-    /// \brief Generic static eval stencils function. This function has a same
+    /// \brief Generic static compute function. This function has a same
     ///        signature as other device kernels have so that it can be called
-    ///        in the same way from OsdMesh template interface.
+    ///        transparently from OsdMesh template interface.
     ///
     /// @param srcBuffer      Input primvar buffer.
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       const float pointer for read
     ///
     /// @param srcDesc        vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer      Output primvar buffer
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param dstDesc        vertex buffer descriptor for the output buffer
     ///
-    /// @param stencilTable   Far::StencilTable or equivalent
+    /// @param stencilTable   stencil table to be applied. The table must have
+    ///                       Cuda memory interfaces.
     ///
-    /// @param instance       not used in the cpu kernel
-    ///                       (declared as a typed pointer to prevent
-    ///                        undesirable template resolution)
+    /// @param instance       not used in the CudaEvaluator
     ///
-    /// @param deviceContext  not used in the cpu kernel
+    /// @param deviceContext  not used in the CudaEvaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER, typename STENCIL_TABLE>
     static bool EvalStencils(
         SRC_BUFFER *srcBuffer, BufferDescriptor const &srcDesc,
         DST_BUFFER *dstBuffer, BufferDescriptor const &dstDesc,
         STENCIL_TABLE const *stencilTable,
-        const CpuEvaluator *instance = NULL,
+        const void *instance = NULL,
         void * deviceContext = NULL) {
 
-        (void)instance;       // unused
+        (void)instance;  // unused
         (void)deviceContext;  // unused
-
-        if (stencilTable->GetNumStencils() == 0)
-            return false;
-
-        return EvalStencils(srcBuffer->BindCpuBuffer(), srcDesc,
-                            dstBuffer->BindCpuBuffer(), dstDesc,
-                            &stencilTable->GetSizes()[0],
-                            &stencilTable->GetOffsets()[0],
-                            &stencilTable->GetControlIndices()[0],
-                            &stencilTable->GetWeights()[0],
+        return EvalStencils(srcBuffer->BindCudaBuffer(), srcDesc,
+                            dstBuffer->BindCudaBuffer(), dstDesc,
+                            (int const *)stencilTable->GetSizesBuffer(),
+                            (int const *)stencilTable->GetOffsetsBuffer(),
+                            (int const *)stencilTable->GetIndicesBuffer(),
+                            (float const *)stencilTable->GetWeightsBuffer(),
                             /*start = */ 0,
                             /*end   = */ stencilTable->GetNumStencils());
     }
 
-    /// \brief Static eval stencils function which takes raw CPU pointers for
+    /// \brief Static eval stencils function which takes raw cuda buffers for
     ///        input and output.
     ///
     /// @param src            Input primvar pointer. An offset of srcDesc
@@ -133,36 +183,36 @@ public:
     ///        template interface.
     ///
     /// @param srcBuffer      Input primvar buffer.
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       const float pointer for read
     ///
     /// @param srcDesc        vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer      Output primvar buffer
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param dstDesc        vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer       Output buffer derivative wrt u
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param duDesc         vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer       Output buffer derivative wrt v
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param dvDesc         vertex buffer descriptor for the dvBuffer
     ///
-    /// @param stencilTable   Far::StencilTable or equivalent
+    /// @param stencilTable   stencil table to be applied.
     ///
-    /// @param instance       not used in the cpu kernel
+    /// @param instance       not used in the cuda kernel
     ///                       (declared as a typed pointer to prevent
     ///                        undesirable template resolution)
     ///
-    /// @param deviceContext  not used in the cpu kernel
+    /// @param deviceContext  not used in the cuda kernel
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER, typename STENCIL_TABLE>
     static bool EvalStencils(
@@ -171,28 +221,28 @@ public:
         DST_BUFFER *duBuffer,  BufferDescriptor const &duDesc,
         DST_BUFFER *dvBuffer,  BufferDescriptor const &dvDesc,
         STENCIL_TABLE const *stencilTable,
-        const CpuEvaluator *instance = NULL,
+        const CudaEvaluator *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        return EvalStencils(srcBuffer->BindCpuBuffer(), srcDesc,
-                            dstBuffer->BindCpuBuffer(), dstDesc,
-                            duBuffer->BindCpuBuffer(),  duDesc,
-                            dvBuffer->BindCpuBuffer(),  dvDesc,
-                            &stencilTable->GetSizes()[0],
-                            &stencilTable->GetOffsets()[0],
-                            &stencilTable->GetControlIndices()[0],
-                            &stencilTable->GetWeights()[0],
-                            &stencilTable->GetDuWeights()[0],
-                            &stencilTable->GetDvWeights()[0],
+        return EvalStencils(srcBuffer->BindCudaBuffer(), srcDesc,
+                            dstBuffer->BindCudaBuffer(), dstDesc,
+                            duBuffer->BindCudaBuffer(),  duDesc,
+                            dvBuffer->BindCudaBuffer(),  dvDesc,
+                            (int const *)stencilTable->GetSizesBuffer(),
+                            (int const *)stencilTable->GetOffsetsBuffer(),
+                            (int const *)stencilTable->GetIndicesBuffer(),
+                            (float const *)stencilTable->GetWeightsBuffer(),
+                            (float const *)stencilTable->GetDuWeightsBuffer(),
+                            (float const *)stencilTable->GetDvWeightsBuffer(),
                             /*start = */ 0,
                             /*end   = */ stencilTable->GetNumStencils());
     }
 
     /// \brief Static eval stencils function with derivatives, which takes
-    ///        raw CPU pointers for input and output.
+    ///        raw cuda pointers for input and output.
     ///
     /// @param src            Input primvar pointer. An offset of srcDesc
     ///                       will be applied internally (i.e. the pointer
@@ -250,54 +300,54 @@ public:
     ///        template interface.
     ///
     /// @param srcBuffer      Input primvar buffer.
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       const float pointer for read
     ///
     /// @param srcDesc        vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer      Output primvar buffer
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param dstDesc        vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer       Output buffer derivative wrt u
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param duDesc         vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer       Output buffer derivative wrt v
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param dvDesc         vertex buffer descriptor for the dvBuffer
     ///
     /// @param duuBuffer      Output buffer 2nd derivative wrt u
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param duuDesc        vertex buffer descriptor for the duuBuffer
     ///
     /// @param duvBuffer      Output buffer 2nd derivative wrt u and v
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param duvDesc        vertex buffer descriptor for the duvBuffer
     ///
     /// @param dvvBuffer      Output buffer 2nd derivative wrt v
-    ///                       must have BindCpuBuffer() method returning a
+    ///                       must have BindCudaBuffer() method returning a
     ///                       float pointer for write
     ///
     /// @param dvvDesc        vertex buffer descriptor for the dvvBuffer
     ///
-    /// @param stencilTable   Far::StencilTable or equivalent
+    /// @param stencilTable   stencil table to be applied.
     ///
-    /// @param instance       not used in the cpu kernel
+    /// @param instance       not used in the cuda kernel
     ///                       (declared as a typed pointer to prevent
     ///                        undesirable template resolution)
     ///
-    /// @param deviceContext  not used in the cpu kernel
+    /// @param deviceContext  not used in the cuda kernel
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER, typename STENCIL_TABLE>
     static bool EvalStencils(
@@ -309,34 +359,34 @@ public:
         DST_BUFFER *duvBuffer, BufferDescriptor const &duvDesc,
         DST_BUFFER *dvvBuffer, BufferDescriptor const &dvvDesc,
         STENCIL_TABLE const *stencilTable,
-        const CpuEvaluator *instance = NULL,
+        const CudaEvaluator *instance = NULL,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        return EvalStencils(srcBuffer->BindCpuBuffer(), srcDesc,
-                            dstBuffer->BindCpuBuffer(), dstDesc,
-                            duBuffer->BindCpuBuffer(),  duDesc,
-                            dvBuffer->BindCpuBuffer(),  dvDesc,
-                            duuBuffer->BindCpuBuffer(), duuDesc,
-                            duvBuffer->BindCpuBuffer(), duvDesc,
-                            dvvBuffer->BindCpuBuffer(), dvvDesc,
-                            &stencilTable->GetSizes()[0],
-                            &stencilTable->GetOffsets()[0],
-                            &stencilTable->GetControlIndices()[0],
-                            &stencilTable->GetWeights()[0],
-                            &stencilTable->GetDuWeights()[0],
-                            &stencilTable->GetDvWeights()[0],
-                            &stencilTable->GetDuuWeights()[0],
-                            &stencilTable->GetDuvWeights()[0],
-                            &stencilTable->GetDvvWeights()[0],
+        return EvalStencils(srcBuffer->BindCudaBuffer(), srcDesc,
+                            dstBuffer->BindCudaBuffer(), dstDesc,
+                            duBuffer->BindCudaBuffer(),  duDesc,
+                            dvBuffer->BindCudaBuffer(),  dvDesc,
+                            duuBuffer->BindCudaBuffer(), duuDesc,
+                            duvBuffer->BindCudaBuffer(), duvDesc,
+                            dvvBuffer->BindCudaBuffer(), dvvDesc,
+                            (int const *)stencilTable->GetSizesBuffer(),
+                            (int const *)stencilTable->GetOffsetsBuffer(),
+                            (int const *)stencilTable->GetIndicesBuffer(),
+                            (float const *)stencilTable->GetWeightsBuffer(),
+                            (float const *)stencilTable->GetDuWeightsBuffer(),
+                            (float const *)stencilTable->GetDvWeightsBuffer(),
+                            (float const *)stencilTable->GetDuuWeightsBuffer(),
+                            (float const *)stencilTable->GetDuvWeightsBuffer(),
+                            (float const *)stencilTable->GetDvvWeightsBuffer(),
                             /*start = */ 0,
                             /*end   = */ stencilTable->GetNumStencils());
     }
 
     /// \brief Static eval stencils function with derivatives, which takes
-    ///        raw CPU pointers for input and output.
+    ///        raw cuda pointers for input and output.
     ///
     /// @param src            Input primvar pointer. An offset of srcDesc
     ///                       will be applied internally (i.e. the pointer
@@ -426,13 +476,13 @@ public:
     ///        in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
@@ -440,14 +490,14 @@ public:
     /// @param numPatchCoords   number of patchCoords.
     ///
     /// @param patchCoords      array of locations to be evaluated.
+    ///                         must have BindCudaBuffer() method returning an
+    ///                         array of PatchCoord struct in cuda memory.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -457,19 +507,19 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetPatchArrayBuffer(),
-                           patchTable->GetPatchIndexBuffer(),
-                           patchTable->GetPatchParamBuffer());
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetPatchArrayBuffer(),
+                           (const int *)patchTable->GetPatchIndexBuffer(),
+                           (const PatchParam *)patchTable->GetPatchParamBuffer());
     }
 
     /// \brief Generic limit eval function with derivatives. This function has
@@ -477,25 +527,25 @@ public:
     ///        called in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer         Output buffer derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duDesc           vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer         Output buffer derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvDesc           vertex buffer descriptor for the dvBuffer
@@ -504,13 +554,11 @@ public:
     ///
     /// @param patchCoords      array of locations to be evaluated.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -522,26 +570,21 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        // XXX: PatchCoords is somewhat abusing vertex primvar buffer interop.
-        //      ideally all buffer classes should have templated by datatype
-        //      so that downcast isn't needed there.
-        //      (e.g. Osd::CpuBuffer<PatchCoord> )
-        //
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
-                           duBuffer->BindCpuBuffer(),  duDesc,
-                           dvBuffer->BindCpuBuffer(),  dvDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
+                           duBuffer->BindCudaBuffer(),  duDesc,
+                           dvBuffer->BindCudaBuffer(),  dvDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetPatchArrayBuffer(),
-                           patchTable->GetPatchIndexBuffer(),
-                           patchTable->GetPatchParamBuffer());
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetPatchArrayBuffer(),
+                           (const int *)patchTable->GetPatchIndexBuffer(),
+                           (const PatchParam *)patchTable->GetPatchParamBuffer());
     }
 
     /// \brief Generic limit eval function with derivatives. This function has
@@ -549,43 +592,43 @@ public:
     ///        called in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer         Output buffer derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duDesc           vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer         Output buffer derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvDesc           vertex buffer descriptor for the dvBuffer
     ///
     /// @param duuBuffer        Output buffer 2nd derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duuDesc          vertex buffer descriptor for the duuBuffer
     ///
-    /// @param duvBuffer        Output buffer 2nd derivative wrt u and v
-    ///                         must have BindCpuBuffer() method returning a
+    /// @param duvBuffer        Output buffer 2nd derivative wrt u
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duvDesc          vertex buffer descriptor for the duvBuffer
     ///
     /// @param dvvBuffer        Output buffer 2nd derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvvDesc          vertex buffer descriptor for the dvvBuffer
@@ -594,13 +637,11 @@ public:
     ///
     /// @param patchCoords      array of locations to be evaluated.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -615,29 +656,24 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        // XXX: PatchCoords is somewhat abusing vertex primvar buffer interop.
-        //      ideally all buffer classes should have templated by datatype
-        //      so that downcast isn't needed there.
-        //      (e.g. Osd::CpuBuffer<PatchCoord> )
-        //
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
-                           duBuffer->BindCpuBuffer(),  duDesc,
-                           dvBuffer->BindCpuBuffer(),  dvDesc,
-                           duuBuffer->BindCpuBuffer(), duuDesc,
-                           duvBuffer->BindCpuBuffer(), duvDesc,
-                           dvvBuffer->BindCpuBuffer(), dvvDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
+                           duBuffer->BindCudaBuffer(),  duDesc,
+                           dvBuffer->BindCudaBuffer(),  dvDesc,
+                           duuBuffer->BindCudaBuffer(), duuDesc,
+                           duvBuffer->BindCudaBuffer(), duvDesc,
+                           dvvBuffer->BindCudaBuffer(), dvvDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetPatchArrayBuffer(),
-                           patchTable->GetPatchIndexBuffer(),
-                           patchTable->GetPatchParamBuffer());
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetPatchArrayBuffer(),
+                           (const int *)patchTable->GetPatchIndexBuffer(),
+                           (const PatchParam *)patchTable->GetPatchParamBuffer());
     }
 
     /// \brief Static limit eval function. It takes an array of PatchCoord
@@ -661,10 +697,10 @@ public:
     /// @param patchArrays      an array of Osd::PatchArray struct
     ///                         indexed by PatchCoord::arrayIndex
     ///
-    /// @param patchIndexBuffer an array of patch indices
+    /// @param patchIndices     an array of patch indices
     ///                         indexed by PatchCoord::vertIndex
     ///
-    /// @param patchParamBuffer an array of Osd::PatchParam struct
+    /// @param patchParams      an array of Osd::PatchParam struct
     ///                         indexed by PatchCoord::patchIndex
     ///
     static bool EvalPatches(
@@ -673,8 +709,8 @@ public:
         int numPatchCoords,
         const PatchCoord *patchCoords,
         const PatchArray *patchArrays,
-        const int *patchIndexBuffer,
-        const PatchParam *patchParamBuffer);
+        const int *patchIndices,
+        const PatchParam *patchParams);
 
     /// \brief Static limit eval function. It takes an array of PatchCoord
     ///        and evaluate limit values on given PatchTable.
@@ -707,10 +743,10 @@ public:
     /// @param patchArrays      an array of Osd::PatchArray struct
     ///                         indexed by PatchCoord::arrayIndex
     ///
-    /// @param patchIndexBuffer an array of patch indices
+    /// @param patchIndices     an array of patch indices
     ///                         indexed by PatchCoord::vertIndex
     ///
-    /// @param patchParamBuffer an array of Osd::PatchParam struct
+    /// @param patchParams      an array of Osd::PatchParam struct
     ///                         indexed by PatchCoord::patchIndex
     ///
     static bool EvalPatches(
@@ -721,8 +757,8 @@ public:
         int numPatchCoords,
         PatchCoord const *patchCoords,
         PatchArray const *patchArrays,
-        const int *patchIndexBuffer,
-        PatchParam const *patchParamBuffer);
+        const int *patchIndices,
+        PatchParam const *patchParams);
 
     /// \brief Static limit eval function. It takes an array of PatchCoord
     ///        and evaluate limit values on given PatchTable.
@@ -770,10 +806,10 @@ public:
     /// @param patchArrays      an array of Osd::PatchArray struct
     ///                         indexed by PatchCoord::arrayIndex
     ///
-    /// @param patchIndexBuffer an array of patch indices
+    /// @param patchIndices     an array of patch indices
     ///                         indexed by PatchCoord::vertIndex
     ///
-    /// @param patchParamBuffer an array of Osd::PatchParam struct
+    /// @param patchParams      an array of Osd::PatchParam struct
     ///                         indexed by PatchCoord::patchIndex
     ///
     static bool EvalPatches(
@@ -787,21 +823,21 @@ public:
         int numPatchCoords,
         PatchCoord const *patchCoords,
         PatchArray const *patchArrays,
-        const int *patchIndexBuffer,
-        PatchParam const *patchParamBuffer);
+        const int *patchIndices,
+        PatchParam const *patchParams);
 
     /// \brief Generic limit eval function. This function has a same
     ///        signature as other device kernels have so that it can be called
     ///        in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
@@ -809,14 +845,14 @@ public:
     /// @param numPatchCoords   number of patchCoords.
     ///
     /// @param patchCoords      array of locations to be evaluated.
+    ///                         must have BindCudaBuffer() method returning an
+    ///                         array of PatchCoord struct in cuda memory.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -826,19 +862,19 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetVaryingPatchArrayBuffer(),
-                           patchTable->GetVaryingPatchIndexBuffer(),
-                           patchTable->GetPatchParamBuffer());
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetVaryingPatchArrayBuffer(),
+                           (const int *)patchTable->GetVaryingPatchIndexBuffer(),
+                           (const PatchParam *)patchTable->GetPatchParamBuffer());
     }
 
     /// \brief Generic limit eval function. This function has a same
@@ -846,25 +882,25 @@ public:
     ///        in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer         Output buffer derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duDesc           vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer         Output buffer derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvDesc           vertex buffer descriptor for the dvBuffer
@@ -872,14 +908,14 @@ public:
     /// @param numPatchCoords   number of patchCoords.
     ///
     /// @param patchCoords      array of locations to be evaluated.
+    ///                         must have BindCudaBuffer() method returning an
+    ///                         array of PatchCoord struct in cuda memory.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -891,21 +927,21 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
-                           duBuffer->BindCpuBuffer(),  duDesc,
-                           dvBuffer->BindCpuBuffer(),  dvDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
+                           duBuffer->BindCudaBuffer(), duDesc,
+                           dvBuffer->BindCudaBuffer(), dvDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetVaryingPatchArrayBuffer(),
-                           patchTable->GetVaryingPatchIndexBuffer(),
-                           patchTable->GetPatchParamBuffer());
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetVaryingPatchArrayBuffer(),
+                           (const int *)patchTable->GetVaryingPatchIndexBuffer(),
+                           (const PatchParam *)patchTable->GetPatchParamBuffer());
     }
 
     /// \brief Generic limit eval function. This function has a same
@@ -913,43 +949,43 @@ public:
     ///        in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer         Output buffer derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duDesc           vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer         Output buffer derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvDesc           vertex buffer descriptor for the dvBuffer
     ///
     /// @param duuBuffer        Output buffer 2nd derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duuDesc          vertex buffer descriptor for the duuBuffer
     ///
-    /// @param duvBuffer        Output buffer 2nd derivative wrt u and v
-    ///                         must have BindCpuBuffer() method returning a
+    /// @param duvBuffer        Output buffer 2nd derivative wrt u
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duvDesc          vertex buffer descriptor for the duvBuffer
     ///
     /// @param dvvBuffer        Output buffer 2nd derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvvDesc          vertex buffer descriptor for the dvvBuffer
@@ -957,14 +993,14 @@ public:
     /// @param numPatchCoords   number of patchCoords.
     ///
     /// @param patchCoords      array of locations to be evaluated.
+    ///                         must have BindCudaBuffer() method returning an
+    ///                         array of PatchCoord struct in cuda memory.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -979,24 +1015,24 @@ public:
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
-                           duBuffer->BindCpuBuffer(),  duDesc,
-                           dvBuffer->BindCpuBuffer(),  dvDesc,
-                           duuBuffer->BindCpuBuffer(), duuDesc,
-                           duvBuffer->BindCpuBuffer(), duvDesc,
-                           dvvBuffer->BindCpuBuffer(), dvvDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
+                           duBuffer->BindCudaBuffer(), duDesc,
+                           dvBuffer->BindCudaBuffer(), dvDesc,
+                           duuBuffer->BindCudaBuffer(), duuDesc,
+                           duvBuffer->BindCudaBuffer(), duvDesc,
+                           dvvBuffer->BindCudaBuffer(), dvvDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetVaryingPatchArrayBuffer(),
-                           patchTable->GetVaryingPatchIndexBuffer(),
-                           patchTable->GetPatchParamBuffer());
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetVaryingPatchArrayBuffer(),
+                           (const int *)patchTable->GetVaryingPatchIndexBuffer(),
+                           (const PatchParam *)patchTable->GetPatchParamBuffer());
     }
 
     /// \brief Generic limit eval function. This function has a same
@@ -1004,13 +1040,13 @@ public:
     ///        in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
@@ -1018,16 +1054,16 @@ public:
     /// @param numPatchCoords   number of patchCoords.
     ///
     /// @param patchCoords      array of locations to be evaluated.
+    ///                         must have BindCudaBuffer() method returning an
+    ///                         array of PatchCoord struct in cuda memory.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
     /// @param fvarChannel      face-varying channel
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -1038,19 +1074,19 @@ public:
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
         int fvarChannel,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
-        (void)instance;       // unused
-        (void)deviceContext;  // unused
+        (void)instance;   // unused
+        (void)deviceContext;   // unused
 
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetFVarPatchArrayBuffer(fvarChannel),
-                           patchTable->GetFVarPatchIndexBuffer(fvarChannel),
-                           patchTable->GetFVarPatchParamBuffer(fvarChannel));
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetFVarPatchArrayBuffer(fvarChannel),
+                           (const int *)patchTable->GetFVarPatchIndexBuffer(fvarChannel),
+                           (const PatchParam *)patchTable->GetFVarPatchParamBuffer(fvarChannel));
     }
 
     /// \brief Generic limit eval function. This function has a same
@@ -1058,25 +1094,25 @@ public:
     ///        in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer         Output buffer derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duDesc           vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer         Output buffer derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvDesc           vertex buffer descriptor for the dvBuffer
@@ -1084,43 +1120,43 @@ public:
     /// @param numPatchCoords   number of patchCoords.
     ///
     /// @param patchCoords      array of locations to be evaluated.
+    ///                         must have BindCudaBuffer() method returning an
+    ///                         array of PatchCoord struct in cuda memory.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
     /// @param fvarChannel      face-varying channel
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
     static bool EvalPatchesFaceVarying(
         SRC_BUFFER *srcBuffer, BufferDescriptor const &srcDesc,
         DST_BUFFER *dstBuffer, BufferDescriptor const &dstDesc,
-        DST_BUFFER *duBuffer,  BufferDescriptor const &duDesc,
-        DST_BUFFER *dvBuffer,  BufferDescriptor const &dvDesc,
+        DST_BUFFER *duBuffer, BufferDescriptor const &duDesc,
+        DST_BUFFER *dvBuffer, BufferDescriptor const &dvDesc,
         int numPatchCoords,
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
         int fvarChannel,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
-        (void)instance;       // unused
-        (void)deviceContext;  // unused
+        (void)instance;   // unused
+        (void)deviceContext;   // unused
 
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
-                           duBuffer->BindCpuBuffer(),  duDesc,
-                           dvBuffer->BindCpuBuffer(),  dvDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
+                           duBuffer->BindCudaBuffer(), duDesc,
+                           dvBuffer->BindCudaBuffer(), dvDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetFVarPatchArrayBuffer(fvarChannel),
-                           patchTable->GetFVarPatchIndexBuffer(fvarChannel),
-                           patchTable->GetFVarPatchParamBuffer(fvarChannel));
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetFVarPatchArrayBuffer(fvarChannel),
+                           (const int *)patchTable->GetFVarPatchIndexBuffer(fvarChannel),
+                           (const PatchParam *)patchTable->GetFVarPatchParamBuffer(fvarChannel));
     }
 
     /// \brief Generic limit eval function. This function has a same
@@ -1128,43 +1164,43 @@ public:
     ///        in the same way.
     ///
     /// @param srcBuffer        Input primvar buffer.
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         const float pointer for read
     ///
     /// @param srcDesc          vertex buffer descriptor for the input buffer
     ///
     /// @param dstBuffer        Output primvar buffer
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dstDesc          vertex buffer descriptor for the output buffer
     ///
     /// @param duBuffer         Output buffer derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duDesc           vertex buffer descriptor for the duBuffer
     ///
     /// @param dvBuffer         Output buffer derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvDesc           vertex buffer descriptor for the dvBuffer
     ///
     /// @param duuBuffer        Output buffer 2nd derivative wrt u
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duuDesc          vertex buffer descriptor for the duuBuffer
     ///
-    /// @param duvBuffer        Output buffer 2nd derivative wrt u and v
-    ///                         must have BindCpuBuffer() method returning a
+    /// @param duvBuffer        Output buffer 2nd derivative wrt u
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param duvDesc          vertex buffer descriptor for the duvBuffer
     ///
     /// @param dvvBuffer        Output buffer 2nd derivative wrt v
-    ///                         must have BindCpuBuffer() method returning a
+    ///                         must have BindCudaBuffer() method returning a
     ///                         float pointer for write
     ///
     /// @param dvvDesc          vertex buffer descriptor for the dvvBuffer
@@ -1172,16 +1208,16 @@ public:
     /// @param numPatchCoords   number of patchCoords.
     ///
     /// @param patchCoords      array of locations to be evaluated.
+    ///                         must have BindCudaBuffer() method returning an
+    ///                         array of PatchCoord struct in cuda memory.
     ///
-    /// @param patchTable       CpuPatchTable or equivalent
-    ///                         XXX: currently Far::PatchTable can't be used
-    ///                              due to interface mismatch
+    /// @param patchTable       CudaPatchTable or equivalent
     ///
     /// @param fvarChannel      face-varying channel
     ///
-    /// @param instance         not used in the cpu evaluator
+    /// @param instance         not used in the cuda evaluator
     ///
-    /// @param deviceContext    not used in the cpu evaluator
+    /// @param deviceContext    not used in the cuda evaluator
     ///
     template <typename SRC_BUFFER, typename DST_BUFFER,
               typename PATCHCOORD_BUFFER, typename PATCH_TABLE>
@@ -1197,24 +1233,24 @@ public:
         PATCHCOORD_BUFFER *patchCoords,
         PATCH_TABLE *patchTable,
         int fvarChannel,
-        CpuEvaluator const *instance = NULL,
+        CudaEvaluator const *instance,
         void * deviceContext = NULL) {
 
         (void)instance;       // unused
         (void)deviceContext;  // unused
 
-        return EvalPatches(srcBuffer->BindCpuBuffer(), srcDesc,
-                           dstBuffer->BindCpuBuffer(), dstDesc,
-                           duBuffer->BindCpuBuffer(),  duDesc,
-                           dvBuffer->BindCpuBuffer(),  dvDesc,
-                           duuBuffer->BindCpuBuffer(), duuDesc,
-                           duvBuffer->BindCpuBuffer(), duvDesc,
-                           dvvBuffer->BindCpuBuffer(), dvvDesc,
+        return EvalPatches(srcBuffer->BindCudaBuffer(), srcDesc,
+                           dstBuffer->BindCudaBuffer(), dstDesc,
+                           duBuffer->BindCudaBuffer(), duDesc,
+                           dvBuffer->BindCudaBuffer(), dvDesc,
+                           duuBuffer->BindCudaBuffer(), duuDesc,
+                           duvBuffer->BindCudaBuffer(), duvDesc,
+                           dvvBuffer->BindCudaBuffer(), dvvDesc,
                            numPatchCoords,
-                           (const PatchCoord*)patchCoords->BindCpuBuffer(),
-                           patchTable->GetFVarPatchArrayBuffer(fvarChannel),
-                           patchTable->GetFVarPatchIndexBuffer(fvarChannel),
-                           patchTable->GetFVarPatchParamBuffer(fvarChannel));
+                           (const PatchCoord *)patchCoords->BindCudaBuffer(),
+                           (const PatchArray *)patchTable->GetFVarPatchArrayBuffer(fvarChannel),
+                           (const int *)patchTable->GetFVarPatchIndexBuffer(fvarChannel),
+                           (const PatchParam *)patchTable->GetFVarPatchParamBuffer(fvarChannel));
     }
 
     /// ----------------------------------------------------------------------
@@ -1222,11 +1258,7 @@ public:
     ///   Other methods
     ///
     /// ----------------------------------------------------------------------
-
-    /// \brief synchronize all asynchronous computation invoked on this device.
-    static void Synchronize(void * /*deviceContext = NULL*/) {
-        // nothing.
-    }
+    static void Synchronize(void *deviceContext = NULL);
 };
 
 
@@ -1238,4 +1270,4 @@ using namespace OPENSUBDIV_VERSION;
 }  // end namespace OpenSubdiv
 
 
-#endif  // OPENSUBDIV3_OSD_CPU_EVALUATOR_H
+#endif  // OPENSUBDIV3_OSD_CUDA_EVALUATOR_H

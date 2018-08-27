@@ -22,41 +22,44 @@
 //   language governing permissions and limitations under the Apache License.
 //
 
-#ifndef OPENSUBDIV3_OSD_CPU_GL_VERTEX_BUFFER_H
-#define OPENSUBDIV3_OSD_CPU_GL_VERTEX_BUFFER_H
+#ifndef OPENSUBDIV3_OSD_CUDA_D3D11_VERTEX_BUFFER_H
+#define OPENSUBDIV3_OSD_CUDA_D3D11_VERTEX_BUFFER_H
 
 #include "../version.h"
 
-#include <cstddef>
-#include "../osd/opengl.h"
+struct cudaGraphicsResource;
+
+struct ID3D11Buffer;
+struct ID3D11Device;
+struct ID3D11DeviceContext;
 
 namespace OpenSubdiv {
 namespace OPENSUBDIV_VERSION {
 
 namespace Osd {
 
+/// \brief Concrete vertex buffer class for cuda subdivision and D3D11 drawing.
 ///
-/// \brief Concrete vertex buffer class for cpu subdivision and OpenGL drawing.
+/// CudaD3D11VertexBuffer implements CudaVertexBufferInterface and
+/// D3D11VertexBufferInterface.
 ///
-/// CpuGLVertexBuffer implements CpuVertexBufferInterface and
-/// GLVertexBufferInterface.
+/// The buffer interop between Cuda and D3D is handled automatically when a 
+/// client calls BindCudaBuffer and BindVBO methods.
 ///
-/// The buffer interop between Cpu and GL is handled automatically when a
-/// client calls BindCpuBuffer and BindVBO methods.
-///
-class CpuGLVertexBuffer {
+class CudaD3D11VertexBuffer {
 public:
     /// Creator. Returns NULL if error.
-    static CpuGLVertexBuffer * Create(int numElements, int numVertices,
-                                      void *deviceContext = NULL);
+    static CudaD3D11VertexBuffer * Create(int numElements,
+                                          int numVertices,
+                                          ID3D11DeviceContext *deviceContext);
 
     /// Destructor.
-    ~CpuGLVertexBuffer();
+    virtual ~CudaD3D11VertexBuffer();
 
-    /// This method is meant to be used in client code in order to provide
-    /// coarse vertices data to Osd.
+    /// This method is meant to be used in client code in order to provide coarse
+    /// vertices data to Osd.
     void UpdateData(const float *src, int startVertex, int numVertices,
-                    void *deviceContext = NULL);
+                    void * /*deviceContext*/);
 
     /// Returns how many elements defined in this vertex buffer.
     int GetNumElements() const;
@@ -64,27 +67,36 @@ public:
     /// Returns how many vertices allocated in this vertex buffer.
     int GetNumVertices() const;
 
-    /// Returns cpu memory. GL buffer will be mapped to cpu address
+    /// Returns cuda memory. DX buffer will be mapped to cuda resource
     /// if necessary.
-    float * BindCpuBuffer();
+    float * BindCudaBuffer();
 
-    /// Returns the name of GL buffer object. If the buffer is mapped
-    /// to cpu address, it will be unmapped back to GL.
-    GLuint BindVBO(void *deviceContext = NULL);
+    /// Returns the D3D11 buffer object.
+    ID3D11Buffer *BindD3D11Buffer(ID3D11DeviceContext *deviceContext);
+
+    /// Returns the D3D11 buffer object (for Osd::Mesh interface)
+    ID3D11Buffer *BindVBO(ID3D11DeviceContext *deviceContext) {
+        return BindD3D11Buffer(deviceContext);
+    }
 
 protected:
     /// Constructor.
-    CpuGLVertexBuffer(int numElements, int numVertices);
+    CudaD3D11VertexBuffer(int numElements, int numVertices);
 
-    /// Allocates VBO for this buffer. Returns true if success.
-    bool allocate();
+    bool allocate(ID3D11Device *device);
+
+    // Acquires a cuda resource from DX11
+    void map();
+
+    // Releases a cuda resource to DX11
+    void unmap();
 
 private:
     int _numElements;
     int _numVertices;
-    GLuint _vbo;
-    float *_cpuBuffer;
-    bool _dataDirty;
+    ID3D11Buffer *_d3d11Buffer;
+    void *_cudaBuffer;
+    cudaGraphicsResource *_cudaResource;
 };
 
 }  // end namespace Osd
@@ -94,4 +106,4 @@ using namespace OPENSUBDIV_VERSION;
 
 }  // end namespace OpenSubdiv
 
-#endif  // OPENSUBDIV3_OSD_CPU_GL_VERTEX_BUFFER_H
+#endif  // OPENSUBDIV3_OSD_CUDA_D3D11_VERTEX_BUFFER_H
