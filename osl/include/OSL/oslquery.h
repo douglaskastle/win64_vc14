@@ -42,7 +42,7 @@ Sony Pictures Imageworks terms, above.
 #include <string>
 #include <vector>
 
-#include "oslconfig.h"
+#include <OSL/oslconfig.h>
 
 OSL_NAMESPACE_ENTER
 
@@ -61,12 +61,12 @@ public:
     struct Parameter {
         ustring name;                    ///< name
         TypeDesc type;                   ///< data type
-        bool isoutput;                   ///< is it an output param?
-        bool validdefault;               ///< false if there's no default val
-        bool varlenarray;                ///< is it a varying-length array?
-        bool isstruct;                   ///< is it a structure?
-        bool isclosure;                  ///< is it a closure?
-        void *data;                      ///< pointer to data
+        bool isoutput = false;           ///< is it an output param?
+        bool validdefault = false;       ///< false if there's no default val
+        bool varlenarray = false;        ///< is it a varying-length array?
+        bool isstruct = false;           ///< is it a structure?
+        bool isclosure = false;          ///< is it a closure?
+        void *data = nullptr;            ///< pointer to data
         std::vector<int> idefault;       ///< default int values
         std::vector<float> fdefault;     ///< default float values
         std::vector<ustring> sdefault;   ///< default string values
@@ -75,10 +75,12 @@ public:
         std::vector<ustring> fields;     ///< Names of this struct's fields
         ustring structname;              ///< Name of the struct
         std::vector<Parameter> metadata; ///< Meta-data about the param
-        Parameter ()
-            : isoutput(false), validdefault(false), varlenarray(false),
-              isstruct(false), isclosure(false), data(NULL)
-        { }
+
+        Parameter () {}
+        Parameter (const Parameter& src);
+        Parameter (Parameter&& src);
+        const Parameter& operator= (const Parameter &);
+        const Parameter& operator= (Parameter &&);
     };
 
     OSLQuery ();
@@ -156,9 +158,6 @@ public:
         return e;
     }
 
-    OSL_DEPRECATED("Use geterror(). (Deprecated since 1.5)")
-    std::string error (void) { return geterror(); }
-
 private:
     ustring m_shadername;              ///< Name of shader
     ustring m_shadertypename;          ///< Type of shader
@@ -167,11 +166,18 @@ private:
     std::vector<Parameter> m_meta;     ///< Meta-data about the shader
     friend class pvt::OSOReaderQuery;
 
+#if OIIO_VERSION >= 10803
     /// Internal error reporting routine, with printf-like arguments.
-    /// void error (const char *message, ...) const
+    template<typename... Args>
+    inline void error (string_view fmt, const Args&... args) const {
+        append_error(OIIO::Strutil::format (fmt, args...));
+    }
+#else
+    // Fallback for older OIIO
     TINYFORMAT_WRAP_FORMAT (void, error, const,
-        std::ostringstream msg;, msg, append_error(msg.str());)
-    void append_error (string_view message) const {
+                            std::ostringstream msg;, msg, append_error(msg.str());)
+#endif
+    void append_error (const std::string& message) const {
         if (m_error.size())
             m_error += '\n';
         m_error += message;

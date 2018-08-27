@@ -44,18 +44,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // same if another packages is compiling against OSL and using these headers
 // (OSL may be C++11 but the client package may be older, or vice versa --
 // use these two symbols to differentiate these cases, when important).
-
-// Force C++03 for MSVC in blender since svn the libraries are build with that
-#if !defined(_MSC_VER)
-	#if (__cplusplus >= 201402L)
-	#  define OSL_CPLUSPLUS_VERSION  14
-	#elif (__cplusplus >= 201103L)
-	#  define OSL_CPLUSPLUS_VERSION  11
-	#else
-	#  define OSL_CPLUSPLUS_VERSION  3 /* presume C++03 */
-	#endif
+#if (__cplusplus >= 201402L)
+#  define OSL_CPLUSPLUS_VERSION  14
+#elif (__cplusplus >= 201103L) || _MSC_VER >= 1900
+#  define OSL_CPLUSPLUS_VERSION  11
 #else
-	#  define OSL_CPLUSPLUS_VERSION  3 /* presume C++03 */
+#  error "This version of OSL requires C++11"
 #endif
 
 // Symbol export defines
@@ -67,24 +61,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <OpenEXR/ImathMatrix.h>
 
 // All the things we need from OpenImageIO
-#include <OpenImageIO/version.h>
+#include <OpenImageIO/oiioversion.h>
 #include <OpenImageIO/errorhandler.h>
 #include <OpenImageIO/texture.h>
 #include <OpenImageIO/typedesc.h>
 #include <OpenImageIO/ustring.h>
 #include <OpenImageIO/platform.h>
 
-// Sort out smart pointers
-#if OSL_CPLUSPLUS_VERSION >= 11
-# include <memory>
-#else /* FIXME(C++11): remove this after making C++11 the baseline */
-# include <boost/shared_ptr.hpp>
-#endif
-
 // Extensions to Imath
-#include "matrix22.h"
+#include <OSL/matrix22.h>
 
-#include "oslversion.h"
+#include <OSL/oslversion.h>
 
 OSL_NAMESPACE_ENTER
 
@@ -127,14 +114,6 @@ using OIIO::ustring;
 using OIIO::ustringHash;
 using OIIO::string_view;
 
-// Sort out smart pointers
-#if OSL_CPLUSPLUS_VERSION >= 11
-  using std::shared_ptr;
-  using std::weak_ptr;
-#else /* FIXME(C++11): remove this after making C++11 the baseline */
-  using boost::shared_ptr;
-  using boost::weak_ptr;
-#endif
 
 #ifndef __has_attribute
 #  define __has_attribute(x) 0
@@ -150,6 +129,14 @@ using OIIO::string_view;
 #  define OSL_DEPRECATED(msg) __declspec(deprecated(msg))
 #else
 #  define OSL_DEPRECATED(msg)
+#endif
+
+/// Work around bug in GCC with mixed __attribute__ and alignas parsing
+/// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69585
+#ifdef __GNUC__
+#  define OSL_ALIGNAS(size) __attribute__((aligned(size)))
+#else
+#  define OSL_ALIGNAS(size) alignas(size)
 #endif
 
 OSL_NAMESPACE_EXIT
