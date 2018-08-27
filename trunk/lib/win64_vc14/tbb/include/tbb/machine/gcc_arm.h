@@ -1,21 +1,21 @@
 /*
-    Copyright 2005-2016 Intel Corporation.  All Rights Reserved.
+    Copyright (c) 2005-2018 Intel Corporation
 
-    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
-    you can redistribute it and/or modify it under the terms of the GNU General Public License
-    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
-    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
-    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-    See  the GNU General Public License for more details.   You should have received a copy of
-    the  GNU General Public License along with Threading Building Blocks; if not, write to the
-    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
 
-    As a special exception,  you may use this file  as part of a free software library without
-    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
-    functions from this file, or you compile this file and link it with other files to produce
-    an executable,  this file does not by itself cause the resulting executable to be covered
-    by the GNU General Public License. This exception does not however invalidate any other
-    reasons why the executable file might be covered by the GNU General Public License.
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+
+
+
 */
 
 /*
@@ -26,10 +26,7 @@
 #error Do not include this file directly; include tbb_machine.h instead
 #endif
 
-//TODO: is ARMv7 is the only version ever to support?
-#if !(__ARM_ARCH_7A__)
-#error compilation requires an ARMv7-a architecture.
-#endif
+#if __ARM_ARCH_7A__
 
 #include <sys/param.h>
 #include <unistd.h>
@@ -83,7 +80,7 @@ static inline int32_t __TBB_machine_cmpswp4(volatile void *ptr, int32_t value, i
         "it         eq\n"
         "strexeq    %0, %5, [%3]\n"
         : "=&r" (res), "=&r" (oldval), "+Qo" (*(volatile int32_t*)ptr)
-        : "r" ((int32_t *)ptr), "Ir" (comparand), "r" (value)
+        : "r" ((volatile int32_t *)ptr), "Ir" (comparand), "r" (value)
         : "cc");
     } while (res);
 
@@ -116,7 +113,7 @@ static inline int64_t __TBB_machine_cmpswp8(volatile void *ptr, int64_t value, i
             "it         eq\n"
             "strexdeq   %0, %5, %H5, [%3]"
         : "=&r" (res), "=&r" (oldval), "+Qo" (*(volatile int64_t*)ptr)
-        : "r" ((int64_t *)ptr), "r" (comparand), "r" (value)
+        : "r" ((volatile int64_t *)ptr), "r" (comparand), "r" (value)
         : "cc");
     } while (res);
 
@@ -139,7 +136,7 @@ static inline int32_t __TBB_machine_fetchadd4(volatile void* ptr, int32_t addend
 "       cmp     %1, #0\n"
 "       bne     1b\n"
     : "=&r" (result), "=&r" (tmp), "+Qo" (*(volatile int32_t*)ptr), "=&r"(tmp2)
-    : "r" ((int32_t *)ptr), "Ir" (addend)
+    : "r" ((volatile int32_t *)ptr), "Ir" (addend)
     : "cc");
 
     __TBB_full_memory_fence();
@@ -162,22 +159,13 @@ static inline int64_t __TBB_machine_fetchadd8(volatile void *ptr, int64_t addend
 "       cmp     %1, #0\n"
 "       bne     1b"
     : "=&r" (result), "=&r" (tmp), "+Qo" (*(volatile int64_t*)ptr), "=&r"(tmp2)
-    : "r" ((int64_t *)ptr), "r" (addend)
+    : "r" ((volatile int64_t *)ptr), "r" (addend)
     : "cc");
 
 
     __TBB_full_memory_fence();
 
     return result;
-}
-
-inline void __TBB_machine_pause (int32_t delay )
-{
-    while(delay>0)
-    {
-	__TBB_compiler_fence();
-        delay--;
-    }
 }
 
 namespace tbb {
@@ -205,7 +193,6 @@ namespace internal {
 
 #define __TBB_CompareAndSwap4(P,V,C) __TBB_machine_cmpswp4(P,V,C)
 #define __TBB_CompareAndSwap8(P,V,C) __TBB_machine_cmpswp8(P,V,C)
-#define __TBB_Pause(V) __TBB_machine_pause(V)
 
 // Use generics for some things
 #define __TBB_USE_GENERIC_PART_WORD_CAS                         1
@@ -215,3 +202,19 @@ namespace internal {
 #define __TBB_USE_GENERIC_HALF_FENCED_LOAD_STORE                1
 #define __TBB_USE_GENERIC_DWORD_LOAD_STORE                      1
 #define __TBB_USE_GENERIC_SEQUENTIAL_CONSISTENCY_LOAD_STORE     1
+#elif defined __aarch64__
+// Generic gcc implementations are fine for ARMv8-a except __TBB_PAUSE.
+#include "gcc_generic.h"
+#else
+#error compilation requires an ARMv7-a or ARMv8-a architecture.
+#endif // __ARM_ARCH_7A__
+
+inline void __TBB_machine_pause (int32_t delay)
+{
+    while(delay>0)
+    {
+        __asm__ __volatile__("yield" ::: "memory");
+        delay--;
+    }
+}
+#define __TBB_Pause(V) __TBB_machine_pause(V)
