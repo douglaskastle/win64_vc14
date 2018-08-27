@@ -39,28 +39,18 @@
 #ifndef OPENIMAGEIO_REFCNT_H
 #define OPENIMAGEIO_REFCNT_H
 
+#include <memory>
+
 #include <OpenImageIO/atomic.h>
-
-#if OIIO_CPLUSPLUS_VERSION >= 11
-# include <memory>
-#else
-# include <boost/shared_ptr.hpp>
-#endif
-
 
 
 OIIO_NAMESPACE_BEGIN
 
-#if OIIO_CPLUSPLUS_VERSION < 11
-using boost::shared_ptr;
-#else
-using std::shared_ptr;
-#endif
+using std::shared_ptr;    // DEPRECATED(1.8)
 
 
 
-/// A simple intrusive pointer, modeled after std::shared_ptr and
-/// boost::intrusive_ptr.
+/// A simple intrusive pointer, modeled after std::shared_ptr.
 template<class T>
 class intrusive_ptr
 {
@@ -68,7 +58,7 @@ public:
     typedef T element_type;
 
     /// Default ctr
-    intrusive_ptr () OIIO_NOEXCEPT : m_ptr(NULL) { }
+    intrusive_ptr () noexcept : m_ptr(NULL) { }
 
     /// Construct from a raw pointer (presumed to be just now allocated,
     /// and now owned by us).
@@ -81,12 +71,10 @@ public:
         if (m_ptr) intrusive_ptr_add_ref (m_ptr);
     }
 
-#if OIIO_CPLUSPLUS_VERSION >= 11
     /// Move construct from another intrusive_ptr.
-    intrusive_ptr (intrusive_ptr &&r) OIIO_NOEXCEPT : m_ptr(r.get()) {
+    intrusive_ptr (intrusive_ptr &&r) noexcept : m_ptr(r.get()) {
         r.m_ptr = NULL;
     }
-#endif
 
     /// Destructor
     ~intrusive_ptr () { if (m_ptr) intrusive_ptr_release (m_ptr); }
@@ -97,16 +85,14 @@ public:
         return *this;
     }
 
-#if OIIO_CPLUSPLUS_VERSION >= 11
     /// Move assignment from intrusive_ptr
-    intrusive_ptr & operator= (intrusive_ptr&& r) OIIO_NOEXCEPT {
+    intrusive_ptr & operator= (intrusive_ptr&& r) noexcept {
         intrusive_ptr (static_cast<intrusive_ptr&&>(r)).swap(*this);
         return *this;
     }
-#endif
 
     /// Reset to null reference
-    void reset () OIIO_NOEXCEPT {
+    void reset () noexcept {
         if (m_ptr) { intrusive_ptr_release (m_ptr); m_ptr = NULL; }
     }
 
@@ -119,8 +105,28 @@ public:
         }
     }
 
+    /// Set this smart pointer to null, decrement the object's reference
+    /// count, return the original raw pointer, but do NOT delete the object
+    /// even if the ref count goes to zero. The only safe use case is to
+    /// convert the sole managed pointer to an object into a raw pointer.
+    /// DANGER -- use with caution! This is only safe to do if no other
+    /// intrusive_ptr refers to the object (such a pointer may subsequently
+    /// reset, decrementing the count to 0, and incorrectly free the
+    /// object), and it can cause a memory leak if the caller isn't careful
+    /// to either reassign the returned pointer to another managed pointer
+    /// or delete it manually.
+    T* release () {
+        T* p = m_ptr;
+        if (p) {
+            if (! p->_decref ())
+                DASSERT (0 && "release() when you aren't the sole owner");
+            m_ptr = nullptr;
+        }
+        return p;
+    }
+
     /// Swap intrusive pointers
-    void swap (intrusive_ptr &r) OIIO_NOEXCEPT {
+    void swap (intrusive_ptr &r) noexcept {
         T *tmp = m_ptr; m_ptr = r.m_ptr; r.m_ptr = tmp;
     }
 
@@ -131,10 +137,10 @@ public:
     T* operator->() const { DASSERT (m_ptr); return m_ptr; }
 
     /// Get raw pointer
-    T* get() const OIIO_NOEXCEPT { return m_ptr; }
+    T* get() const noexcept { return m_ptr; }
 
     /// Cast to bool to detect whether it points to anything
-    operator bool () const OIIO_NOEXCEPT { return m_ptr != NULL; }
+    operator bool () const noexcept { return m_ptr != NULL; }
 
 private:
     T* m_ptr;   // the raw pointer
@@ -202,6 +208,11 @@ inline void intrusive_ptr_release (T *x)
 // clever, but it will end up getting the address of (and destroying)
 // just the inherited RefCnt sub-object, not the full subclass you
 // meant to delete and destroy.
+
+
+
+// Preprocessor flags for some capabilities added incrementally.
+#define OIIO_REFCNT_HAS_RELEASE 1   /* intrusive_ptr::release() */
 
 
 OIIO_NAMESPACE_END
