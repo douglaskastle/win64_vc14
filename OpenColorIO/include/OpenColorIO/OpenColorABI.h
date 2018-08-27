@@ -31,8 +31,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Makefile configuration options
 #define OCIO_NAMESPACE OpenColorIO
-#define OCIO_USE_BOOST_PTR 1
-#define OCIO_VERSION "1.0.9"
+#define OCIO_USE_BOOST_PTR 0
+#define OCIO_VERSION "1.1.0"
 #define OCIO_VERSION_NS v1
 
 /* Version as a single 4-byte hex number, e.g. 0x01050200 == 1.5.2
@@ -41,8 +41,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    this will reflect the original API version number.
    */
 #define OCIO_VERSION_HEX ((1 << 24) | \
-                          (0 << 16) | \
-                          (9 <<  8))
+                          (1 << 16) | \
+                          (0 <<  8))
 
 
 // Namespace / version mojo
@@ -63,6 +63,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tr1/memory>
 #define OCIO_SHARED_PTR std::tr1::shared_ptr
 #define OCIO_DYNAMIC_POINTER_CAST std::tr1::dynamic_pointer_cast
+#elif (_MSC_VER > 1600)
+#include <memory>
+#define OCIO_SHARED_PTR std::shared_ptr
+#define OCIO_DYNAMIC_POINTER_CAST std::dynamic_pointer_cast
 #else
 #error OCIO needs gcc 4 or later to get access to <tr1/memory> (or specify USE_BOOST_PTR instead)
 #endif
@@ -79,11 +83,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     #endif
 #elif defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS) || defined(_MSC_VER)
     // Windows requires you to export from the main library and then import in any others
-    #if defined OpenColorIO_EXPORTS
-        #define OCIOEXPORT __declspec(dllexport)
-    #else
-        #define OCIOEXPORT __declspec(dllimport)
-    #endif
+	#ifndef OpenColorIO_STATIC
+		#if defined OpenColorIO_EXPORTS
+			#define OCIOEXPORT __declspec(dllexport)
+		#else
+			#define OCIOEXPORT __declspec(dllimport)
+		#endif
+	#else
+		#define OCIOEXPORT
+	#endif
     #define OCIOHIDDEN
 #else // Others platforms not supported atm
     #define OCIOEXPORT
