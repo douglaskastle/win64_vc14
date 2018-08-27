@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -66,8 +66,8 @@
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
 #include "Morphology.h"
-#include <boost/utility.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
+#include <iostream>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -109,15 +109,16 @@ template<typename GridT,
 class LevelSetRayIntersector
 {
 public:
-    typedef GridT                         GridType;
-    typedef RayT                          RayType;
-    typedef typename RayT::RealType       RealType;
-    typedef typename RayT::Vec3T          Vec3Type;
-    typedef typename GridT::ValueType     ValueT;
-    typedef typename GridT::TreeType      TreeT;
+    using GridType = GridT;
+    using RayType = RayT;
+    using RealType = typename RayT::RealType;
+    using Vec3Type = typename RayT::Vec3T;
+    using ValueT = typename GridT::ValueType;
+    using TreeT = typename GridT::TreeType;
 
-    BOOST_STATIC_ASSERT( NodeLevel >= -1 && NodeLevel < int(TreeT::DEPTH)-1);
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
+    static_assert(NodeLevel >= -1 && NodeLevel < int(TreeT::DEPTH)-1, "NodeLevel out of range");
+    static_assert(std::is_floating_point<ValueT>::value,
+        "level set grids must have scalar, floating-point value types");
 
     /// @brief Constructor
     /// @param grid level set grid to intersect rays against.
@@ -303,13 +304,13 @@ template<typename GridT,
 class VolumeRayIntersector
 {
 public:
-    typedef GridT                         GridType;
-    typedef RayT                          RayType;
-    typedef typename RayT::RealType       RealType;
-    typedef typename GridT::TreeType::RootNodeType RootType;
-    typedef tree::Tree<typename RootType::template ValueConverter<bool>::Type> TreeT;
+    using GridType = GridT;
+    using RayType = RayT;
+    using RealType = typename RayT::RealType;
+    using RootType = typename GridT::TreeType::RootNodeType;
+    using TreeT = tree::Tree<typename RootType::template ValueConverter<bool>::Type>;
 
-    BOOST_STATIC_ASSERT( NodeLevel >= 0 && NodeLevel < int(TreeT::DEPTH)-1);
+    static_assert(NodeLevel >= 0 && NodeLevel < int(TreeT::DEPTH)-1, "NodeLevel out of range");
 
     /// @brief Grid constructor
     /// @param grid Generic grid to intersect rays against.
@@ -494,8 +495,7 @@ public:
     }
 
 private:
-
-    typedef typename tree::ValueAccessor<const TreeT,/*IsSafe=*/false> AccessorT;
+    using AccessorT = typename tree::ValueAccessor<const TreeT,/*IsSafe=*/false>;
 
     const bool      mIsMaster;
     TreeT*          mTree;
@@ -539,10 +539,11 @@ template<typename GridT, int Iterations, typename RealT>
 class LinearSearchImpl
 {
 public:
-    typedef math::Ray<RealT>              RayT;
-    typedef typename GridT::ValueType     ValueT;
-    typedef typename GridT::ConstAccessor AccessorT;
-    typedef math::BoxStencil<GridT>       StencilT;
+    using RayT = math::Ray<RealT>;
+    using VecT = math::Vec3<RealT>;
+    using ValueT = typename GridT::ValueType;
+    using AccessorT = typename GridT::ConstAccessor;
+    using StencilT = math::BoxStencil<GridT>;
 
     /// @brief Constructor from a grid.
     /// @throw RunTimeError if the grid is empty.
@@ -586,16 +587,16 @@ public:
 
     /// @brief Get the intersection point in index space.
     /// @param xyz The position in index space of the intersection.
-    inline void getIndexPos(Vec3d& xyz) const { xyz = mRay(mTime); }
+    inline void getIndexPos(VecT& xyz) const { xyz = mRay(mTime); }
 
     /// @brief Get the intersection point in world space.
     /// @param xyz The position in world space of the intersection.
-    inline void getWorldPos(Vec3d& xyz) const { xyz = mStencil.grid().indexToWorld(mRay(mTime)); }
+    inline void getWorldPos(VecT& xyz) const { xyz = mStencil.grid().indexToWorld(mRay(mTime)); }
 
     /// @brief Get the intersection point and normal in world space
     /// @param xyz The position in world space of the intersection.
     /// @param nml The surface normal in world space of the intersection.
-    inline void getWorldPosAndNml(Vec3d& xyz, Vec3d& nml)
+    inline void getWorldPosAndNml(VecT& xyz, VecT& nml)
     {
         this->getIndexPos(xyz);
         mStencil.moveTo(xyz);
@@ -632,7 +633,7 @@ private:
     template <typename NodeT>
     inline bool hasNode(const Coord& ijk)
     {
-        return mStencil.accessor().template probeConstNode<NodeT>(ijk) != NULL;
+        return mStencil.accessor().template probeConstNode<NodeT>(ijk) != nullptr;
     }
 
     /// @brief Return @c true if an intersection is detected.
@@ -668,13 +669,13 @@ private:
 
     inline RealT interpTime()
     {
-        assert(math::isApproxLarger(mT[1], mT[0], 1e-6));
+        assert( math::isApproxLarger(mT[1], mT[0], RealT(1e-6) ) );
         return mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
     }
 
     inline RealT interpValue(RealT time)
     {
-        const Vec3R pos = mRay(time);
+        const VecT pos = mRay(time);
         mStencil.moveTo(pos);
         return mStencil.interpolation(pos) - mIsoValue;
     }
@@ -696,6 +697,6 @@ private:
 
 #endif // OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

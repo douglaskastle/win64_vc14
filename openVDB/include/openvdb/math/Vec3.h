@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,10 +31,13 @@
 #ifndef OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 
-#include <cmath>
 #include <openvdb/Exceptions.h>
 #include "Math.h"
 #include "Tuple.h"
+#include <algorithm>
+#include <cmath>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -47,13 +50,13 @@ template<typename T>
 class Vec3: public Tuple<3, T>
 {
 public:
-    typedef T value_type;
-    typedef T ValueType;
+    using value_type = T;
+    using ValueType = T;
 
     /// Trivial constructor, the vector is NOT initialized
     Vec3() {}
 
-    /// Constructor with one argument, e.g.   Vec3f v(0);
+    /// @brief Construct a vector all of whose components have the given value.
     explicit Vec3(T val) { this->mm[0] = this->mm[1] = this->mm[2] = val; }
 
     /// Constructor with three arguments, e.g.   Vec3d v(1,2,3);
@@ -81,6 +84,16 @@ public:
         this->mm[0] = static_cast<T>(v[0]);
         this->mm[1] = static_cast<T>(v[1]);
         this->mm[2] = static_cast<T>(v[2]);
+    }
+
+    /// @brief Construct a vector all of whose components have the given value,
+    /// which may be of an arithmetic type different from this vector's value type.
+    /// @details Type conversion warnings are suppressed.
+    template<typename Other>
+    explicit Vec3(Other val,
+        typename std::enable_if<std::is_arithmetic<Other>::value, Conversion>::type = Conversion{})
+    {
+        this->mm[0] = this->mm[1] = this->mm[2] = static_cast<T>(val);
     }
 
     /// @brief Construct a Vec3 from another Vec3 with a possibly different value type.
@@ -248,7 +261,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i *= scalar\f$ for \f$i \in [0, 2]\f$
+    /// Multiply each element of this vector by @a scalar.
     template <typename S>
     const Vec3<T> &operator*=(S scalar)
     {
@@ -258,7 +271,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i *= v1_i\f$ for \f$i \in [0, 2]\f$
+    /// Multiply each element of this vector by the corresponding element of the given vector.
     template <typename S>
     const Vec3<T> &operator*=(const Vec3<S> &v1)
     {
@@ -268,7 +281,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i /= scalar\f$ for \f$i \in [0, 2]\f$
+    /// Divide each element of this vector by @a scalar.
     template <typename S>
     const Vec3<T> &operator/=(S scalar)
     {
@@ -278,7 +291,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i /= v1_i\f$ for \f$i \in [0, 2]\f$
+    /// Divide each element of this vector by the corresponding element of the given vector.
     template <typename S>
     const Vec3<T> &operator/=(const Vec3<S> &v1)
     {
@@ -288,7 +301,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i += scalar\f$ for \f$i \in [0, 2]\f$
+    /// Add @a scalar to each element of this vector.
     template <typename S>
     const Vec3<T> &operator+=(S scalar)
     {
@@ -298,7 +311,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i += v1_i\f$ for \f$i \in [0, 2]\f$
+    /// Add each element of the given vector to the corresponding element of this vector.
     template <typename S>
     const Vec3<T> &operator+=(const Vec3<S> &v1)
     {
@@ -308,7 +321,7 @@ public:
         return *this;
     }
 
-    /// Returns v, where \f$v_i += scalar\f$ for \f$i \in [0, 2]\f$
+    /// Subtract @a scalar from each element of this vector.
     template <typename S>
     const Vec3<T> &operator-=(S scalar)
     {
@@ -318,7 +331,7 @@ public:
         return *this;
     }
 
-    /// Returns v0, where \f$v0_i -= v1_i\f$ for \f$i \in [0, 2]\f$
+    /// Subtract each element of the given vector from the corresponding element of this vector.
     template <typename S>
     const Vec3<T> &operator-=(const Vec3<S> &v1)
     {
@@ -328,7 +341,7 @@ public:
         return *this;
     }
 
-    /// Return a reference to itsef after the exponent has been
+    /// Return a reference to itself after the exponent has been
     /// applied to all the vector components.
     inline const Vec3<T>& exp()
     {
@@ -338,10 +351,26 @@ public:
         return *this;
     }
 
+    /// Return a reference to itself after log has been
+    /// applied to all the vector components.
+    inline const Vec3<T>& log()
+    {
+        this->mm[0] = std::log(this->mm[0]);
+        this->mm[1] = std::log(this->mm[1]);
+        this->mm[2] = std::log(this->mm[2]);
+        return *this;
+    }
+
     /// Return the sum of all the vector components.
     inline T sum() const
     {
         return this->mm[0] + this->mm[1] + this->mm[2];
+    }
+
+    /// Return the product of all the vector components.
+    inline T product() const
+    {
+        return this->mm[0] * this->mm[1] * this->mm[2];
     }
 
     /// this = normalized this
@@ -371,6 +400,13 @@ public:
             OPENVDB_THROW(ArithmeticError, "Normalizing null 3-vector");
         }
         return *this / len;
+    }
+
+    /// return normalized this, or (1, 0, 0) if this is null vector
+    Vec3<T> unitSafe() const
+    {
+        T l2 = lengthSqr();
+        return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
     }
 
     // Number of cols, rows, elements
@@ -411,13 +447,13 @@ public:
             l = this->mm[0]*this->mm[0] + this->mm[2]*this->mm[2];
             l = static_cast<T>(T(1)/sqrt(double(l)));
             u.mm[0] = -this->mm[2]*l;
-            u.mm[1] = (T)0.0;
+            u.mm[1] = T(0);
             u.mm[2] = +this->mm[0]*l;
         } else {
             // W.y or W.z is the largest magnitude component, swap them
             l = this->mm[1]*this->mm[1] + this->mm[2]*this->mm[2];
             l = static_cast<T>(T(1)/sqrt(double(l)));
-            u.mm[0] = (T)0.0;
+            u.mm[0] = T(0);
             u.mm[1] = +this->mm[2]*l;
             u.mm[2] = -this->mm[1]*l;
         }
@@ -425,23 +461,25 @@ public:
         return u;
     }
 
-    /// True if a Nan is present in vector
-    bool isNan() const { return isnan(this->mm[0]) || isnan(this->mm[1]) || isnan(this->mm[2]); }
-
-    /// True if an Inf is present in vector
-    bool isInfinite() const
+    /// Return a vector with the components of this in ascending order
+    Vec3<T> sorted() const
     {
-        return isinf(this->mm[0]) || isinf(this->mm[1]) || isinf(this->mm[2]);
+        Vec3<T> r(*this);
+        if( r.mm[0] > r.mm[1] ) std::swap(r.mm[0], r.mm[1]);
+        if( r.mm[1] > r.mm[2] ) std::swap(r.mm[1], r.mm[2]);
+        if( r.mm[0] > r.mm[1] ) std::swap(r.mm[0], r.mm[1]);
+        return r;
     }
 
-    /// True if all no Nan or Inf values present
-    bool isFinite() const
+    /// Return the vector (z, y, x)
+    Vec3<T> reversed() const
     {
-        return finite(this->mm[0]) && finite(this->mm[1]) && finite(this->mm[2]);
+        return Vec3<T>(this->mm[2], this->mm[1], this->mm[0]);
     }
 
     /// Predefined constants, e.g.   Vec3d v = Vec3d::xNegAxis();
     static Vec3<T> zero() { return Vec3<T>(0, 0, 0); }
+    static Vec3<T> ones() { return Vec3<T>(1, 1, 1); }
 };
 
 
@@ -457,11 +495,11 @@ inline bool operator==(const Vec3<T0> &v0, const Vec3<T1> &v1)
 template <typename T0, typename T1>
 inline bool operator!=(const Vec3<T0> &v0, const Vec3<T1> &v1) { return !(v0==v1); }
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 2]\f$
+/// Multiply each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec3<typename promote<S, T>::type> operator*(S scalar, const Vec3<T> &v) { return v*scalar; }
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 2]\f$
+/// Multiply each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec3<typename promote<S, T>::type> operator*(const Vec3<T> &v, S scalar)
 {
@@ -470,7 +508,7 @@ inline Vec3<typename promote<S, T>::type> operator*(const Vec3<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i * v1_i\f$ for \f$i \in [0, 2]\f$
+/// Multiply corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec3<typename promote<T0, T1>::type> operator*(const Vec3<T0> &v0, const Vec3<T1> &v1)
 {
@@ -479,14 +517,14 @@ inline Vec3<typename promote<T0, T1>::type> operator*(const Vec3<T0> &v0, const 
 }
 
 
-/// Returns V, where \f$V_i = scalar / v_i\f$ for \f$i \in [0, 2]\f$
+/// Divide @a scalar by each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec3<typename promote<S, T>::type> operator/(S scalar, const Vec3<T> &v)
 {
     return Vec3<typename promote<S, T>::type>(scalar/v[0], scalar/v[1], scalar/v[2]);
 }
 
-/// Returns V, where \f$V_i = v_i / scalar\f$ for \f$i \in [0, 2]\f$
+/// Divide each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec3<typename promote<S, T>::type> operator/(const Vec3<T> &v, S scalar)
 {
@@ -495,7 +533,7 @@ inline Vec3<typename promote<S, T>::type> operator/(const Vec3<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i / v1_i\f$ for \f$i \in [0, 2]\f$
+/// Divide corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec3<typename promote<T0, T1>::type> operator/(const Vec3<T0> &v0, const Vec3<T1> &v1)
 {
@@ -503,7 +541,7 @@ inline Vec3<typename promote<T0, T1>::type> operator/(const Vec3<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i + v1_i\f$ for \f$i \in [0, 2]\f$
+/// Add corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec3<typename promote<T0, T1>::type> operator+(const Vec3<T0> &v0, const Vec3<T1> &v1)
 {
@@ -512,7 +550,7 @@ inline Vec3<typename promote<T0, T1>::type> operator+(const Vec3<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v_i + scalar\f$ for \f$i \in [0, 2]\f$
+/// Add @a scalar to each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec3<typename promote<S, T>::type> operator+(const Vec3<T> &v, S scalar)
 {
@@ -521,7 +559,7 @@ inline Vec3<typename promote<S, T>::type> operator+(const Vec3<T> &v, S scalar)
     return result;
 }
 
-/// Returns V, where \f$V_i = v0_i - v1_i\f$ for \f$i \in [0, 2]\f$
+/// Subtract corresponding elements of @a v0 and @a v1 and return the result.
 template <typename T0, typename T1>
 inline Vec3<typename promote<T0, T1>::type> operator-(const Vec3<T0> &v0, const Vec3<T1> &v1)
 {
@@ -530,7 +568,7 @@ inline Vec3<typename promote<T0, T1>::type> operator-(const Vec3<T0> &v0, const 
     return result;
 }
 
-/// Returns V, where \f$V_i = v_i - scalar\f$ for \f$i \in [0, 2]\f$
+/// Subtract @a scalar from each element of the given vector and return the result.
 template <typename S, typename T>
 inline Vec3<typename promote<S, T>::type> operator-(const Vec3<T> &v, S scalar)
 {
@@ -561,13 +599,6 @@ isApproxEqual(const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& eps)
     return isApproxEqual(a.x(), b.x(), eps.x()) &&
            isApproxEqual(a.y(), b.y(), eps.y()) &&
            isApproxEqual(a.z(), b.z(), eps.z());
-}
-
-template<typename T>
-inline bool
-isFinite(const Vec3<T>& v)
-{
-    return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]);
 }
 
 template<typename T>
@@ -637,10 +668,15 @@ inline Vec3<T> maxComponent(const Vec3<T> &v1, const Vec3<T> &v2)
 template <typename T>
 inline Vec3<T> Exp(Vec3<T> v) { return v.exp(); }
 
-typedef Vec3<int32_t>   Vec3i;
-typedef Vec3<uint32_t>  Vec3ui;
-typedef Vec3<float>     Vec3s;
-typedef Vec3<double>    Vec3d;
+/// @brief Return a vector with log applied to each of
+/// the components of the input vector.
+template <typename T>
+inline Vec3<T> Log(Vec3<T> v) { return v.log(); }
+
+using Vec3i = Vec3<int32_t>;
+using Vec3ui = Vec3<uint32_t>;
+using Vec3s = Vec3<float>;
+using Vec3d = Vec3<double>;
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
@@ -648,6 +684,6 @@ typedef Vec3<double>    Vec3d;
 
 #endif // OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

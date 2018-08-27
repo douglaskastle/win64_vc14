@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,14 +31,15 @@
 #ifndef OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 
-#include <iostream>
-#include <cmath>
-
 #include "Mat.h"
 #include "Mat3.h"
 #include "Math.h"
 #include "Vec3.h"
 #include <openvdb/Exceptions.h>
+#include <cmath>
+#include <iostream>
+#include <sstream>
+#include <string>
 
 
 namespace openvdb {
@@ -164,12 +165,12 @@ public:
              OPENVDB_THROW(ArithmeticError,
                 "A non-rotation matrix can not be used to construct a quaternion");
         }
-        if (!isApproxEqual(rot.det(), (T1)1)) { // rule out reflection
+        if (!isApproxEqual(rot.det(), T1(1))) { // rule out reflection
              OPENVDB_THROW(ArithmeticError,
                 "A reflection matrix can not be used to construct a quaternion");
         }
 
-        T trace = (T)rot.trace();
+        T trace(rot.trace());
         if (trace > 0) {
 
             T q_w = 0.5 * std::sqrt(trace+1);
@@ -555,8 +556,8 @@ public:
     static Quat identity() { return Quat<T>(0,0,0,1); }
 
      /// @return string representation of Classname
-    std::string
-    str() const {
+    std::string str() const
+    {
         std::ostringstream buffer;
 
         buffer << "[";
@@ -581,19 +582,14 @@ public:
 
     friend Quat slerp<>(const Quat &q1, const Quat &q2, T t, T tolerance);
 
-
-    void write(std::ostream& os) const {
-        os.write((char*)&mm, sizeof(T)*4);
-    }
-    void read(std::istream& is) {
-        is.read((char*)&mm, sizeof(T)*4);
-    }
+    void write(std::ostream& os) const { os.write(static_cast<char*>(&mm), sizeof(T) * 4); }
+    void read(std::istream& is) { is.read(static_cast<char*>(&mm), sizeof(T) * 4); }
 
 protected:
     T mm[4];
 };
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 3]\f$
+/// Multiply each element of the given quaternion by @a scalar and return the result.
 template <typename S, typename T>
 Quat<T> operator*(S scalar, const Quat<T> &q) { return q*scalar; }
 
@@ -604,7 +600,7 @@ Quat<T> operator*(S scalar, const Quat<T> &q) { return q*scalar; }
 template <typename T, typename T0>
 Mat3<T> slerp(const Mat3<T0> &m1, const Mat3<T0> &m2, T t)
 {
-    typedef Mat3<T> MatType;
+    using MatType = Mat3<T>;
 
     Quat<T> q1(m1);
     Quat<T> q2(m2);
@@ -643,16 +639,20 @@ Mat3<T> bezLerp(const Mat3<T0> &m1, const Mat3<T0> &m2,
     return slerp(m10, m11, t);
 }
 
-typedef Quat<float> Quats;
-typedef Quat<double> Quatd;
+using Quats = Quat<float>;
+using Quatd = Quat<double>;
 
 } // namespace math
+
+
+template<> inline math::Quats zeroVal<math::Quats >() { return math::Quats::zero(); }
+template<> inline math::Quatd zeroVal<math::Quatd >() { return math::Quatd::zero(); }
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif //OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 
-// ---------------------------------------------------------------------------
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

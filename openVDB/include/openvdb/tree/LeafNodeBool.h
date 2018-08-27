@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,19 +28,20 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifndef OPENVDB_TREE_LEAFNODEBOOL_HAS_BEEN_INCLUDED
-#define OPENVDB_TREE_LEAFNODEBOOL_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
+#define OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 
-#include <iostream>
-#include <boost/shared_ptr.hpp>
-#include <boost/shared_array.hpp>
-#include <boost/static_assert.hpp>
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include <openvdb/math/Math.h> // for math::isZero()
 #include <openvdb/util/NodeMasks.h>
 #include "LeafNode.h"
 #include "Iterator.h"
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 
 namespace openvdb {
@@ -54,10 +55,12 @@ template<Index Log2Dim>
 class LeafNode<bool, Log2Dim>
 {
 public:
-    typedef LeafNode<bool, Log2Dim>         LeafNodeType;
-    typedef boost::shared_ptr<LeafNodeType> Ptr;
-    typedef bool                            ValueType;
-    typedef util::NodeMask<Log2Dim>         NodeMaskType;
+    using LeafNodeType = LeafNode<bool, Log2Dim>;
+    using BuildType = bool;
+    using ValueType = bool;
+    using Buffer = LeafBuffer<ValueType, Log2Dim>;
+    using NodeMaskType = util::NodeMask<Log2Dim>;
+    using Ptr = SharedPtr<LeafNodeType>;
 
     // These static declarations must be on separate lines to avoid VC9 compiler errors.
     static const Index LOG2DIM    = Log2Dim;    // needed by parent nodes
@@ -71,7 +74,7 @@ public:
     /// @brief ValueConverter<T>::Type is the type of a LeafNode having the same
     /// dimensions as this node but a different value type, T.
     template<typename ValueType>
-    struct ValueConverter { typedef LeafNode<ValueType, Log2Dim> Type; };
+    struct ValueConverter { using Type = LeafNode<ValueType, Log2Dim>; };
 
     /// @brief SameConfiguration<OtherNodeType>::value is @c true if and only if
     /// OtherNodeType is the type of a LeafNode with the same dimensions as this node.
@@ -79,63 +82,6 @@ public:
     struct SameConfiguration {
         static const bool value = SameLeafConfig<LOG2DIM, OtherNodeType>::value;
     };
-
-
-    class Buffer
-    {
-    public:
-        typedef typename NodeMaskType::Word WordType;
-        static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
-        Buffer() {}
-        Buffer(bool on) : mData(on) {}
-        Buffer(const NodeMaskType& other): mData(other) {}
-        Buffer(const Buffer& other): mData(other.mData) {}
-        ~Buffer() {}
-        void fill(bool val) { mData.set(val); }
-        Buffer& operator=(const Buffer& b) { if (&b != this) { mData = b.mData; } return *this; }
-
-        const bool& getValue(Index i) const
-        {
-            assert(i < SIZE);
-            // We can't use the ternary operator here, otherwise Visual C++ returns
-            // a reference to a temporary.
-            if (mData.isOn(i)) return LeafNode::sOn; else return LeafNode::sOff;
-        }
-        const bool& operator[](Index i) const { return this->getValue(i); }
-
-        bool operator==(const Buffer& other) const { return mData == other.mData; }
-        bool operator!=(const Buffer& other) const { return mData != other.mData; }
-
-        void setValue(Index i, bool val) { assert(i < SIZE); mData.set(i, val); }
-
-        void swap(Buffer& other) { if (&other != this) std::swap(mData, other.mData); }
-
-        Index memUsage() const { return mData.memUsage(); }
-        static Index size() { return SIZE; }
-
-        /// Return a point to the c-style array of words encoding the bits.
-        /// @warning This method should only be used by experts that
-        /// seek low-level optimizations.
-        WordType* data()
-        {
-            return &(mData.template getWord<WordType>(0));
-        }
-        /// Return a const point to the c-style array of words
-        /// encoding the bits.
-        /// @warning This method should only be used by experts that
-        /// seek low-level optimizations.
-        const WordType* data() const
-        {
-            return const_cast<Buffer*>(this)->data();
-        }
-
-    private:
-        friend class ::TestLeaf;
-        // Allow the parent LeafNode to access this Buffer's bit mask.
-        friend class LeafNode;
-
-        NodeMaskType mData;
-    }; // class Buffer
 
 
     /// Default constructor
@@ -147,13 +93,16 @@ public:
     /// @param active  the active state to which to initialize all voxels
     explicit LeafNode(const Coord& xyz, bool value = false, bool active = false);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// "Partial creation" constructor used during file input
     LeafNode(PartialCreate, const Coord& xyz, bool value = false, bool active = false);
 #endif
 
     /// Deep copy constructor
     LeafNode(const LeafNode&);
+
+    /// Deep assignment operator
+    LeafNode& operator=(const LeafNode&) = default;
 
     /// Value conversion copy constructor
     template<typename OtherValueType>
@@ -205,7 +154,7 @@ public:
     /// Return @c true if this node only contains active voxels.
     bool isDense() const { return mValueMask.isOn(); }
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Return @c true if memory for this node's buffer has been allocated.
     /// @details Currently, boolean leaf nodes don't support partial creation,
     /// so this always returns @c true.
@@ -359,6 +308,8 @@ public:
 
     /// Set all voxels within an axis-aligned box to the specified value and active state.
     void fill(const CoordBBox& bbox, bool value, bool active = true);
+    /// Set all voxels within an axis-aligned box to the specified value and active state.
+    void denseFill(const CoordBBox& bbox, bool val, bool on = true) { this->fill(bbox, val, on); }
 
     /// Set all voxels to the specified value but don't change their active states.
     void fill(const bool& value);
@@ -470,16 +421,40 @@ public:
     /// @brief Return a const reference to the first entry in the buffer.
     /// @note Since it's actually a reference to a static data member
     /// it should not be converted to a non-const pointer!
-    const bool& getFirstValue() const { if (mValueMask.isOn(0)) return sOn; else return sOff; }
+    const bool& getFirstValue() const { if (mValueMask.isOn(0)) return Buffer::sOn; else return Buffer::sOff; }
     /// @brief Return a const reference to the last entry in the buffer.
     /// @note Since it's actually a reference to a static data member
     /// it should not be converted to a non-const pointer!
-    const bool& getLastValue() const { if (mValueMask.isOn(SIZE-1)) return sOn; else return sOff; }
+    const bool& getLastValue() const { if (mValueMask.isOn(SIZE-1)) return Buffer::sOn; else return Buffer::sOff; }
 
     /// Return @c true if all of this node's voxels have the same active state
     /// and are equal to within the given tolerance, and return the value in
     /// @a constValue and the active state in @a state.
     bool isConstant(bool& constValue, bool& state, bool tolerance = 0) const;
+
+    /// @brief Computes the median value of all the active and inactive voxels in this node.
+    /// @return The median value.
+    ///
+    /// @details The median for boolean values is defined as the mode
+    /// of the values, i.e. the value that occurs most often.
+    bool medianAll() const;
+
+    /// @brief Computes the median value of all the active voxels in this node.
+    /// @return The number of active voxels.
+    /// @param value Updated with the median value of all the active voxels.
+    ///
+    /// @details The median for boolean values is defined as the mode
+    /// of the values, i.e. the value that occurs most often.
+    Index medianOn(ValueType &value) const;
+
+    /// @brief Computes the median value of all the inactive voxels in this node.
+    /// @return The number of inactive voxels.
+    /// @param value Updated with the median value of all the inactive voxels.
+    ///
+    /// @details The median for boolean values is defined as the mode
+    /// of the values, i.e. the value that occurs most often.
+    Index medianOff(ValueType &value) const;
+
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
 
@@ -491,7 +466,9 @@ public:
     void merge(const LeafNode& other, bool bg = false, bool otherBG = false);
     template<MergePolicy Policy> void merge(bool tileValue, bool tileActive);
 
-    void voxelizeActiveTiles() {}
+    /// @brief No-op
+    /// @details This function exists only to enable template instantiation.
+    void voxelizeActiveTiles(bool = true) {}
 
     /// @brief Union this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a
@@ -567,11 +544,11 @@ public:
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
     template<typename NodeT>
-    NodeT* stealNode(const Coord&, const ValueType&, bool) { return NULL; }
+    NodeT* stealNode(const Coord&, const ValueType&, bool) { return nullptr; }
     template<typename NodeT>
-    NodeT* probeNode(const Coord&) { return NULL; }
+    NodeT* probeNode(const Coord&) { return nullptr; }
     template<typename NodeT>
-    const NodeT* probeConstNode(const Coord&) const { return NULL; }
+    const NodeT* probeConstNode(const Coord&) const { return nullptr; }
     template<typename ArrayT> void getNodes(ArrayT&) const {}
     template<typename ArrayT> void stealNodes(ArrayT&, const ValueType&, bool) {}
     //@}
@@ -593,7 +570,7 @@ public:
     NodeT* probeNodeAndCache(const Coord&, AccessorT&)
     {
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        if (!(std::is_same<NodeT, LeafNode>::value)) return nullptr;
         return reinterpret_cast<NodeT*>(this);
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
@@ -610,7 +587,7 @@ public:
     const NodeT* probeConstNodeAndCache(const Coord&, AccessorT&) const
     {
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        if (!(std::is_same<NodeT, LeafNode>::value)) return nullptr;
         return reinterpret_cast<const NodeT*>(this);
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
@@ -620,9 +597,9 @@ public:
     // Iterators
     //
 protected:
-    typedef typename NodeMaskType::OnIterator    MaskOnIter;
-    typedef typename NodeMaskType::OffIterator   MaskOffIter;
-    typedef typename NodeMaskType::DenseIterator MaskDenseIter;
+    using MaskOnIter = typename NodeMaskType::OnIterator;
+    using MaskOffIter = typename NodeMaskType::OffIterator;
+    using MaskDenseIter = typename NodeMaskType::DenseIterator;
 
     template<typename MaskIterT, typename NodeT, typename ValueT>
     struct ValueIter:
@@ -630,7 +607,7 @@ protected:
         // if MaskIterT is a dense mask iterator type.
         public SparseIteratorBase<MaskIterT, ValueIter<MaskIterT, NodeT, ValueT>, NodeT, ValueT>
     {
-        typedef SparseIteratorBase<MaskIterT, ValueIter, NodeT, ValueT> BaseT;
+        using BaseT = SparseIteratorBase<MaskIterT, ValueIter, NodeT, ValueT>;
 
         ValueIter() {}
         ValueIter(const MaskIterT& iter, NodeT* parent): BaseT(iter, parent) {}
@@ -665,8 +642,8 @@ protected:
     struct DenseIter: public DenseIteratorBase<
         MaskDenseIter, DenseIter<NodeT, ValueT>, NodeT, /*ChildT=*/void, ValueT>
     {
-        typedef DenseIteratorBase<MaskDenseIter, DenseIter, NodeT, void, ValueT> BaseT;
-        typedef typename BaseT::NonConstValueType NonConstValueT;
+        using BaseT = DenseIteratorBase<MaskDenseIter, DenseIter, NodeT, void, ValueT>;
+        using NonConstValueT = typename BaseT::NonConstValueType;
 
         DenseIter() {}
         DenseIter(const MaskDenseIter& iter, NodeT* parent): BaseT(iter, parent) {}
@@ -674,7 +651,7 @@ protected:
         bool getItem(Index pos, void*& child, NonConstValueT& value) const
         {
             value = this->parent().getValue(pos);
-            child = NULL;
+            child = nullptr;
             return false; // no child
         }
 
@@ -686,18 +663,18 @@ protected:
     };
 
 public:
-    typedef ValueIter<MaskOnIter, LeafNode, const bool>           ValueOnIter;
-    typedef ValueIter<MaskOnIter, const LeafNode, const bool>     ValueOnCIter;
-    typedef ValueIter<MaskOffIter, LeafNode, const bool>          ValueOffIter;
-    typedef ValueIter<MaskOffIter, const LeafNode, const bool>    ValueOffCIter;
-    typedef ValueIter<MaskDenseIter, LeafNode, const bool>        ValueAllIter;
-    typedef ValueIter<MaskDenseIter, const LeafNode, const bool>  ValueAllCIter;
-    typedef ChildIter<MaskOnIter, LeafNode>                       ChildOnIter;
-    typedef ChildIter<MaskOnIter, const LeafNode>                 ChildOnCIter;
-    typedef ChildIter<MaskOffIter, LeafNode>                      ChildOffIter;
-    typedef ChildIter<MaskOffIter, const LeafNode>                ChildOffCIter;
-    typedef DenseIter<LeafNode, bool>                             ChildAllIter;
-    typedef DenseIter<const LeafNode, const bool>                 ChildAllCIter;
+    using ValueOnIter = ValueIter<MaskOnIter, LeafNode, const bool>;
+    using ValueOnCIter = ValueIter<MaskOnIter, const LeafNode, const bool>;
+    using ValueOffIter = ValueIter<MaskOffIter, LeafNode, const bool>;
+    using ValueOffCIter = ValueIter<MaskOffIter, const LeafNode, const bool>;
+    using ValueAllIter = ValueIter<MaskDenseIter, LeafNode, const bool>;
+    using ValueAllCIter = ValueIter<MaskDenseIter, const LeafNode, const bool>;
+    using ChildOnIter = ChildIter<MaskOnIter, LeafNode>;
+    using ChildOnCIter = ChildIter<MaskOnIter, const LeafNode>;
+    using ChildOffIter = ChildIter<MaskOffIter, LeafNode>;
+    using ChildOffCIter = ChildIter<MaskOffIter, const LeafNode>;
+    using ChildAllIter = DenseIter<LeafNode, bool>;
+    using ChildAllCIter = DenseIter<const LeafNode, const bool>;
 
     ValueOnCIter  cbeginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
     ValueOnCIter   beginValueOn() const { return ValueOnCIter(mValueMask.beginOn(), this); }
@@ -749,6 +726,7 @@ public:
     bool isValueMaskOff(Index n) const { return mValueMask.isOff(n); }
     bool isValueMaskOff() const { return mValueMask.isOff(); }
     const NodeMaskType& getValueMask() const { return mValueMask; }
+    const NodeMaskType& valueMask() const { return mValueMask; }
     NodeMaskType& getValueMask() { return mValueMask; }
     void setValueMask(const NodeMaskType& mask) { mValueMask = mask; }
     bool isChildMaskOn(Index) const { return false; } // leaf nodes have no children
@@ -781,10 +759,6 @@ protected:
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
 
-    // These static declarations must be on separate lines to avoid VC9 compiler errors.
-    static const bool sOn;
-    static const bool sOff;
-
 private:
     /// @brief During topology-only construction, access is needed
     /// to protected/private members of other template instances.
@@ -808,41 +782,34 @@ private:
 }; // class LeafNode<bool>
 
 
-/// @internal For consistency with other nodes and with iterators, methods like
-/// LeafNode::getValue() return a reference to a value.  Since it's not possible
-/// to return a reference to a bit in a node mask, we return a reference to one
-/// of the following static values instead.
-template<Index Log2Dim> const bool LeafNode<bool, Log2Dim>::sOn = true;
-template<Index Log2Dim> const bool LeafNode<bool, Log2Dim>::sOff = false;
-
-
 ////////////////////////////////////////
 
 
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(): mOrigin(0, 0, 0)
+LeafNode<bool, Log2Dim>::LeafNode()
+  : mOrigin(0, 0, 0)
 {
 }
 
 
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active):
-    mValueMask(active),
-    mBuffer(value),
-    mOrigin(xyz & (~(DIM - 1)))
+LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active)
+    : mValueMask(active)
+    , mBuffer(value)
+    , mOrigin(xyz & (~(DIM - 1)))
 {
 }
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active):
-    mValueMask(active),
-    mBuffer(value),
-    mOrigin(xyz & (~(DIM - 1)))
+LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active)
+    : mValueMask(active)
+    , mBuffer(value)
+    , mOrigin(xyz & (~(DIM - 1)))
 {
     /// @todo For now, this is identical to the non-PartialCreate constructor.
     /// Consider modifying the Buffer class to allow it to be constructed
@@ -853,10 +820,10 @@ LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, b
 
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other):
-    mValueMask(other.mValueMask),
-    mBuffer(other.mBuffer),
-    mOrigin(other.mOrigin)
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other)
+    : mValueMask(other.valueMask())
+    , mBuffer(other.mBuffer)
+    , mOrigin(other.mOrigin)
 {
 }
 
@@ -865,9 +832,9 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other):
 template<Index Log2Dim>
 template<typename ValueT>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other):
-    mValueMask(other.getValueMask()),
-    mOrigin(other.origin())
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other)
+    : mValueMask(other.valueMask())
+    , mOrigin(other.origin())
 {
     struct Local {
         /// @todo Consider using a value conversion functor passed as an argument instead.
@@ -884,10 +851,10 @@ template<Index Log2Dim>
 template<typename ValueT>
 inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
-                                  bool background, TopologyCopy):
-    mValueMask(other.getValueMask()),
-    mBuffer(background),
-    mOrigin(other.origin())
+                                  bool background, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mBuffer(background)
+    , mOrigin(other.origin())
 {
 }
 
@@ -895,10 +862,10 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
 template<Index Log2Dim>
 template<typename ValueT>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy):
-    mValueMask(other.getValueMask()),
-    mBuffer(other.getValueMask()), // value = active state
-    mOrigin(other.origin())
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mBuffer(other.valueMask())// value = active state
+    , mOrigin(other.origin())
 {
 }
 
@@ -907,10 +874,10 @@ template<Index Log2Dim>
 template<typename ValueT>
 inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
-                                  bool offValue, bool onValue, TopologyCopy):
-    mValueMask(other.getValueMask()),
-    mBuffer(other.getValueMask()),
-    mOrigin(other.origin())
+                                  bool offValue, bool onValue, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mBuffer(other.valueMask())
+    , mOrigin(other.origin())
 {
     if (offValue) { if (!onValue) mBuffer.mData.toggle(); else mBuffer.mData.setOn(); }
 }
@@ -930,7 +897,8 @@ template<Index Log2Dim>
 inline Index64
 LeafNode<bool, Log2Dim>::memUsage() const
 {
-    return sizeof(mOrigin) + mValueMask.memUsage() + mBuffer.memUsage();
+    // Use sizeof(*this) to capture alignment-related padding
+    return sizeof(*this);
 }
 
 
@@ -1066,7 +1034,7 @@ LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, bool /*fromHalf*/)
 
         // Read in the buffer.
         // (Note: prior to the bool leaf optimization, buffers were always compressed.)
-        boost::shared_array<bool> buf(new bool[SIZE]);
+        std::unique_ptr<bool[]> buf{new bool[SIZE]};
         io::readData<bool>(is, buf.get(), SIZE, /*isCompressed=*/true);
 
         // Transfer values to mBuffer.
@@ -1106,7 +1074,9 @@ template<Index Log2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::operator==(const LeafNode& other) const
 {
-    return (mValueMask == other.mValueMask && mBuffer.mData == other.mBuffer.mData);
+    return mOrigin == other.mOrigin &&
+           mValueMask == other.valueMask() &&
+           mBuffer == other.mBuffer;
 }
 
 
@@ -1125,18 +1095,44 @@ template<Index Log2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool tolerance) const
 {
-    state = mValueMask.isOn();
-
-    if (!(state || mValueMask.isOff())) return false;
+    if (!mValueMask.isConstant(state)) return false;
 
     // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
     if (!tolerance && !(mBuffer.mData.isOn() || mBuffer.mData.isOff())) return false;
 
-    state = mValueMask.isOn();
     constValue = mBuffer.mData.isOn();
     return true;
 }
 
+////////////////////////////////////////
+
+template<Index Log2Dim>
+inline bool
+LeafNode<bool, Log2Dim>::medianAll() const
+{
+    const Index countTrue = mBuffer.mData.countOn();
+    return countTrue > (NUM_VALUES >> 1);
+}
+
+template<Index Log2Dim>
+inline Index
+LeafNode<bool, Log2Dim>::medianOn(bool& state) const
+{
+    const NodeMaskType tmp = mBuffer.mData & mValueMask;//both true and active
+    const Index countTrueOn = tmp.countOn(), countOn = mValueMask.countOn();
+    state = countTrueOn > (NUM_VALUES >> 1);
+    return countOn;
+}
+
+template<Index Log2Dim>
+inline Index
+LeafNode<bool, Log2Dim>::medianOff(bool& state) const
+{
+    const NodeMaskType tmp = mBuffer.mData & (!mValueMask);//both true and inactive
+    const Index countTrueOff = tmp.countOn(), countOff = mValueMask.countOff();
+    state = countTrueOff > (NUM_VALUES >> 1);
+    return countOff;
+}
 
 ////////////////////////////////////////
 
@@ -1153,8 +1149,8 @@ inline void
 LeafNode<bool, Log2Dim>::addTile(Index offset, bool val, bool active)
 {
     assert(offset < SIZE);
-    setValueOnly(offset, val);
-    setActiveState(offset, active);
+    this->setValueOnly(offset, val);
+    this->setActiveState(offset, active);
 }
 
 template<Index Log2Dim>
@@ -1175,7 +1171,7 @@ inline const bool&
 LeafNode<bool, Log2Dim>::getValue(const Coord& xyz) const
 {
     // This *CANNOT* use operator ? because Visual C++
-    if (mBuffer.mData.isOn(this->coordToOffset(xyz))) return sOn; else return sOff;
+    if (mBuffer.mData.isOn(this->coordToOffset(xyz))) return Buffer::sOn; else return Buffer::sOff;
 }
 
 
@@ -1185,7 +1181,7 @@ LeafNode<bool, Log2Dim>::getValue(Index offset) const
 {
     assert(offset < SIZE);
     // This *CANNOT* use operator ? for Windows
-    if (mBuffer.mData.isOn(offset)) return sOn; else return sOff;
+    if (mBuffer.mData.isOn(offset)) return Buffer::sOn; else return Buffer::sOff;
 }
 
 
@@ -1311,7 +1307,7 @@ LeafNode<bool, Log2Dim>::merge(const LeafNode& other, bool /*bg*/, bool /*otherB
 {
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Policy == MERGE_NODES) return;
-    for (typename NodeMaskType::OnIterator iter = other.mValueMask.beginOn(); iter; ++iter) {
+    for (typename NodeMaskType::OnIterator iter = other.valueMask().beginOn(); iter; ++iter) {
         const Index n = iter.pos();
         if (mValueMask.isOff(n)) {
             mBuffer.mData.set(n, other.mBuffer.mData.isOn(n));
@@ -1345,7 +1341,7 @@ template<typename OtherType>
 inline void
 LeafNode<bool, Log2Dim>::topologyUnion(const LeafNode<OtherType, Log2Dim>& other)
 {
-    mValueMask |= other.getValueMask();
+    mValueMask |= other.valueMask();
 }
 
 
@@ -1355,7 +1351,7 @@ inline void
 LeafNode<bool, Log2Dim>::topologyIntersection(const LeafNode<OtherType, Log2Dim>& other,
                                               const bool&)
 {
-    mValueMask &= other.getValueMask();
+    mValueMask &= other.valueMask();
 }
 
 
@@ -1365,7 +1361,7 @@ inline void
 LeafNode<bool, Log2Dim>::topologyDifference(const LeafNode<OtherType, Log2Dim>& other,
                                             const bool&)
 {
-    mValueMask &= !other.getValueMask();
+    mValueMask &= !other.valueMask();
 }
 
 
@@ -1416,11 +1412,15 @@ template<Index Log2Dim>
 inline void
 LeafNode<bool, Log2Dim>::fill(const CoordBBox& bbox, bool value, bool active)
 {
-    for (Int32 x = bbox.min().x(); x <= bbox.max().x(); ++x) {
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    for (Int32 x = clippedBBox.min().x(); x <= clippedBBox.max().x(); ++x) {
         const Index offsetX = (x & (DIM-1u))<<2*Log2Dim;
-        for (Int32 y = bbox.min().y(); y <= bbox.max().y(); ++y) {
+        for (Int32 y = clippedBBox.min().y(); y <= clippedBBox.max().y(); ++y) {
             const Index offsetXY = offsetX + ((y & (DIM-1u))<<  Log2Dim);
-            for (Int32 z = bbox.min().z(); z <= bbox.max().z(); ++z) {
+            for (Int32 z = clippedBBox.min().z(); z <= clippedBBox.max().z(); ++z) {
                 const Index offset = offsetXY + (z & (DIM-1u));
                 mValueMask.set(offset, active);
                 mBuffer.mData.set(offset, value);
@@ -1453,7 +1453,7 @@ template<typename DenseT>
 inline void
 LeafNode<bool, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
-    typedef typename DenseT::ValueType DenseValueType;
+    using DenseValueType = typename DenseT::ValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
     const Coord& min = dense.bbox().min();
@@ -1479,7 +1479,7 @@ inline void
 LeafNode<bool, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
                                        bool background, bool tolerance)
 {
-    typedef typename DenseT::ValueType DenseValueType;
+    using DenseValueType = typename DenseT::ValueType;
     struct Local {
         inline static bool toBool(const DenseValueType& v) { return !math::isZero(v); }
     };
@@ -1523,7 +1523,7 @@ LeafNode<bool, Log2Dim>::combine(const LeafNode& other, CombineOp& op)
         op(args.setARef(aVal)
             .setAIsActive(mValueMask.isOn(i))
             .setBRef(bVal)
-            .setBIsActive(other.mValueMask.isOn(i))
+            .setBIsActive(other.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1563,7 +1563,7 @@ LeafNode<bool, Log2Dim>::combine2(const LeafNode& other, const OtherType& value,
     for (Index i = 0; i < SIZE; ++i) {
         bool result = false, aVal = other.mBuffer.mData.isOn(i);
         op(args.setARef(aVal)
-            .setAIsActive(other.mValueMask.isOn(i))
+            .setAIsActive(other.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1582,7 +1582,7 @@ LeafNode<bool, Log2Dim>::combine2(bool value, const OtherNodeT& other,
     for (Index i = 0; i < SIZE; ++i) {
         bool result = false, bVal = other.mBuffer.mData.isOn(i);
         op(args.setBRef(bVal)
-            .setBIsActive(other.mValueMask.isOn(i))
+            .setBIsActive(other.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1598,13 +1598,13 @@ LeafNode<bool, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, Comb
     CombineArgs<bool, typename OtherNodeT::ValueType> args;
     for (Index i = 0; i < SIZE; ++i) {
         // Default behavior: output voxel is active if either input voxel is active.
-        mValueMask.set(i, b0.mValueMask.isOn(i) || b1.mValueMask.isOn(i));
+        mValueMask.set(i, b0.valueMask().isOn(i) || b1.valueMask().isOn(i));
 
         bool result = false, b0Val = b0.mBuffer.mData.isOn(i), b1Val = b1.mBuffer.mData.isOn(i);
         op(args.setARef(b0Val)
-            .setAIsActive(b0.mValueMask.isOn(i))
+            .setAIsActive(b0.valueMask().isOn(i))
             .setBRef(b1Val)
-            .setBIsActive(b1.mValueMask.isOn(i))
+            .setBIsActive(b1.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1700,8 +1700,10 @@ inline void
 LeafNode<bool, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp& op)
 {
     // Allow the two nodes to have different ValueTypes, but not different dimensions.
-    BOOST_STATIC_ASSERT(OtherNodeT::SIZE == NodeT::SIZE);
-    BOOST_STATIC_ASSERT(OtherNodeT::LEVEL == NodeT::LEVEL);
+    static_assert(OtherNodeT::SIZE == NodeT::SIZE,
+        "can't visit nodes of different sizes simultaneously");
+    static_assert(OtherNodeT::LEVEL == NodeT::LEVEL,
+        "can't visit nodes at different tree levels simultaneously");
 
     ChildAllIterT iter = self.beginChildAll();
     OtherChildAllIterT otherIter = other.beginChildAll();
@@ -1760,8 +1762,8 @@ LeafNode<bool, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIter,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_TREE_LEAFNODEBOOL_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

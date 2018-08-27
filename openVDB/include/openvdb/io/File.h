@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,13 +33,16 @@
 #ifndef OPENVDB_IO_FILE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_FILE_HAS_BEEN_INCLUDED
 
+#include <openvdb/version.h>
 #include "io.h" // for MappedFile::Notifier
 #include "Archive.h"
 #include "GridDescriptor.h"
+#include <algorithm> // for std::copy()
 #include <iosfwd>
+#include <iterator> // for std::back_inserter()
 #include <map>
+#include <memory>
 #include <string>
-#include <boost/scoped_ptr.hpp>
 
 
 class TestFile;
@@ -54,11 +57,11 @@ namespace io {
 class OPENVDB_API File: public Archive
 {
 public:
-    typedef std::multimap<Name, GridDescriptor> NameMap;
-    typedef NameMap::const_iterator NameMapCIter;
+    using NameMap = std::multimap<Name, GridDescriptor>;
+    using NameMapCIter = NameMap::const_iterator;
 
     explicit File(const std::string& filename);
-    virtual ~File();
+    ~File() override;
 
     /// @brief Copy constructor
     /// @details The copy will be closed and will not reference the same
@@ -72,7 +75,7 @@ public:
     /// @brief Return a copy of this archive.
     /// @details The copy will be closed and will not reference the same
     /// file descriptor as the original.
-    virtual boost::shared_ptr<Archive> copy() const;
+    SharedPtr<Archive> copy() const override;
 
     /// @brief Return the name of the file with which this archive is associated.
     /// @details The file does not necessarily exist on disk yet.
@@ -135,28 +138,19 @@ public:
     /// @throw KeyError if no grid with the given name exists in this file.
     GridBase::Ptr readGridMetadata(const Name&);
 
-    /// @brief Read a grid's metadata, topology, transform, etc., but not
-    /// any of its leaf node data blocks.
-    /// @return the grid pointer to the partially loaded grid.
-    /// @note This returns a @c const pointer, so that the grid can't be
-    /// changed before its data blocks have been loaded.  A non-<tt>const</tt>
-    /// pointer is only returned when readGrid() is called.
-    GridBase::ConstPtr readGridPartial(const Name&);
-
     /// Read an entire grid, including all of its data blocks.
     GridBase::Ptr readGrid(const Name&);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// @brief Read a grid, including its data blocks, but only where it
     /// intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const Name&, const BBoxd&);
 #endif
 
-    /// @todo GridPtrVec readAllGridsPartial(const Name&)
     /// @todo GridPtrVec readAllGrids(const Name&)
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
-    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const;
+    void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const override;
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
@@ -169,6 +163,7 @@ public:
     {
     public:
         NameIterator(const NameMapCIter& iter): mIter(iter) {}
+        NameIterator(const NameIterator&) = default;
         ~NameIterator() {}
 
         NameIterator& operator++() { mIter++; return *this; }
@@ -210,7 +205,7 @@ private:
 
     /// Read in and return the grid specified by the given grid descriptor.
     GridBase::Ptr readGrid(const GridDescriptor&) const;
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
     /// Read in and return the region of the grid specified by the given grid descriptor
     /// that intersects the given world-space bounding box.
     GridBase::Ptr readGrid(const GridDescriptor&, const BBoxd&) const;
@@ -242,7 +237,7 @@ private:
     friend class ::TestStream;
 
     struct Impl;
-    boost::scoped_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
 };
 
 
@@ -271,6 +266,6 @@ File::write(const GridPtrContainerT& container, const MetaMap& meta) const
 
 #endif // OPENVDB_IO_FILE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

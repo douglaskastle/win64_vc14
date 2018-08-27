@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,14 +37,11 @@
 #ifndef OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-#include <boost/utility/enable_if.hpp>
-#include <boost/static_assert.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-
 #include <openvdb/math/Math.h> // for isNegative and negative
-#include <openvdb/Types.h> // for Index typedef
 #include <openvdb/Types.h>
 #include <openvdb/tree/NodeManager.h>
+#include <algorithm> // for std::nth_element()
+#include <type_traits>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -55,10 +52,9 @@ namespace tools {
 /// any nodes whose values are all the same (optionally to within a tolerance)
 /// and have the same active state.
 ///
-/// @note For trees with floating-point values a child node with (approximately)
-/// constant values are replaced with a tile value corresponding to the average
-/// of the extrema values in said child node. Else the first value encountered
-/// in the child node is used.
+/// @note For trees with non-boolean values a child node with (approximately)
+/// constant values are replaced with a tile value corresponding to the median
+/// of the values in said child node.
 ///
 /// @param tree       the tree to be pruned
 /// @param tolerance  tolerance within which values are considered to be equal
@@ -166,10 +162,10 @@ template<typename TreeT, Index TerminationLevel = 0>
 class InactivePruneOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
+    using ValueT = typename TreeT::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    static_assert(RootT::LEVEL > TerminationLevel, "TerminationLevel out of range");
 
     InactivePruneOp(TreeT& tree) : mValue(tree.background())
     {
@@ -183,6 +179,7 @@ public:
 
     // Nothing to do at the leaf node level
     void operator()(LeafT&) const {}
+
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     void operator()(NodeT& node) const
@@ -193,6 +190,7 @@ public:
             }
         }
     }
+
     // Prune the child nodes of the root node
     void operator()(RootT& root) const
     {
@@ -201,8 +199,8 @@ public:
         }
         root.eraseBackgroundTiles();
     }
-private:
 
+private:
     const ValueT mValue;
 };// InactivePruneOp
 
@@ -211,12 +209,12 @@ template<typename TreeT, Index TerminationLevel = 0>
 class TolerancePruneOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
+    using ValueT = typename TreeT::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    static_assert(RootT::LEVEL > TerminationLevel, "TerminationLevel out of range");
 
-    TolerancePruneOp(TreeT& tree, const ValueT& t) : mTolerance(t)
+    TolerancePruneOp(TreeT& tree, const ValueT& tol) : mTolerance(tol)
     {
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
@@ -249,28 +247,40 @@ public:
     inline void operator()(LeafT&) const {}
 
 private:
+    // Private method specialized for leaf nodes
+    inline ValueT median(LeafT& leaf) const {return leaf.medianAll(leaf.buffer().data());}
 
-    // For floating-point value types set tile values to
-    // the mean of the extrema values of the constant node
+    // Private method for internal nodes
+    template<typename NodeT>
+    inline typename NodeT::ValueType median(NodeT& node) const
+    {
+        using UnionT = typename NodeT::UnionType;
+        UnionT* data = const_cast<UnionT*>(node.getTable());//never do this at home kids :)
+        static const size_t midpoint = (NodeT::NUM_VALUES - 1) >> 1;
+        auto op = [](const UnionT& a, const UnionT& b){return a.getValue() < b.getValue();};
+        std::nth_element(data, data + midpoint, data + NodeT::NUM_VALUES, op);
+        return data[midpoint].getValue();
+    }
+
+    // Specialization to nodes templated on booleans values
     template<typename NodeT>
     inline
-    typename boost::enable_if<boost::is_floating_point<typename NodeT::ValueType>, bool>::type
-    isConstant(const NodeT& node, ValueT& value, bool& state) const
+    typename std::enable_if<std::is_same<bool, typename NodeT::ValueType>::value, bool>::type
+    isConstant(NodeT& node, bool& value, bool& state) const
+    {
+        return node.isConstant(value, state, mTolerance);
+    }
+
+    // Nodes templated on non-boolean values
+    template<typename NodeT>
+    inline
+    typename std::enable_if<!std::is_same<bool, typename NodeT::ValueType>::value, bool>::type
+    isConstant(NodeT& node, ValueT& value, bool& state) const
     {
         ValueT tmp;
         const bool test = node.isConstant(value, tmp, state, mTolerance);
-        if (test) value = ValueT(0.5f)*(value + tmp);
+        if (test) value = this->median(node);
         return test;
-    }
-
-    // For non-floating-point value types set tile values to
-    // the first value encountered in the constant node
-    template<typename NodeT>
-    inline
-    typename boost::disable_if<boost::is_floating_point<typename NodeT::ValueType>, bool>::type
-    isConstant(const NodeT& node, ValueT& value, bool& state) const
-    {
-        return node.isConstant(value, state, mTolerance);
     }
 
     const ValueT mTolerance;
@@ -281,10 +291,10 @@ template<typename TreeT, Index TerminationLevel = 0>
 class LevelSetPruneOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
+    using ValueT = typename TreeT::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    static_assert(RootT::LEVEL > TerminationLevel, "TerminationLevel out of range");
 
     LevelSetPruneOp(TreeT& tree)
         : mOutside(tree.background())
@@ -296,6 +306,7 @@ public:
         }
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
+
     LevelSetPruneOp(TreeT& tree, const ValueT& outside, const ValueT& inside)
         : mOutside(outside)
         , mInside(inside)
@@ -310,8 +321,10 @@ public:
         }
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
+
     // Nothing to do at the leaf node level
     void operator()(LeafT&) const {}
+
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     void operator()(NodeT& node) const
@@ -322,6 +335,7 @@ public:
             }
         }
     }
+
     // Prune the child nodes of the root node
     void operator()(RootT& root) const
     {
@@ -348,7 +362,7 @@ prune(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t grainSiz
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     TolerancePruneOp<TreeT> op(tree, tol);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -358,7 +372,7 @@ pruneTiles(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t gra
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-3> nodes(tree);
     TolerancePruneOp<TreeT> op(tree, tol);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -368,7 +382,7 @@ pruneInactive(TreeT& tree, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     InactivePruneOp<TreeT> op(tree);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -379,7 +393,7 @@ pruneInactiveWithValue(TreeT& tree, const typename TreeT::ValueType& v,
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     InactivePruneOp<TreeT> op(tree, v);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -393,7 +407,7 @@ pruneLevelSet(TreeT& tree,
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     LevelSetPruneOp<TreeT> op(tree, outside, inside);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -403,7 +417,7 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     LevelSetPruneOp<TreeT> op(tree);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 } // namespace tools
@@ -412,6 +426,6 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 
 #endif // OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file    PointPartitioner.h
 ///
 /// @brief   Spatially partitions points using a parallel radix-based
@@ -45,24 +45,23 @@
 #ifndef OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 
-
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 
+#include <boost/integer.hpp> // boost::int_t<N>::least
+#include <boost/scoped_array.hpp>
+
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_for.h>
+#include <tbb/task_scheduler_init.h>
+
+#include <algorithm>
+#include <cmath> // for std::isfinite()
 #include <deque>
 #include <map>
 #include <set>
 #include <utility> // std::pair
 #include <vector>
-
-#include <boost/integer.hpp> // boost::int_t<N>::least
-#include <boost/scoped_array.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/math/special_functions/fpclassify.hpp> // boost::math::isfinite
-
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/task_scheduler_init.h>
 
 
 namespace openvdb {
@@ -78,13 +77,19 @@ namespace tools {
 ///          using a parallel radix-based sorting algorithm.
 ///
 /// @interface PointArray
-/// Expected interface for the PointArray container
+/// Expected interface for the PointArray container:
 /// @code
 /// template<typename VectorType>
-/// struct PointList {
-///   typedef VectorType value_type;
-///   size_t size() const; // total number of points
-///   void getPos(size_t n, VectorType& xyz) const;
+/// struct PointArray
+/// {
+///     // The type used to represent world-space point positions
+///     using PosType = VectorType;
+///
+///     // Return the number of points in the array
+///     size_t size() const;
+///
+///     // Return the world-space position of the nth point in the array.
+///     void getPos(size_t n, PosType& xyz) const;
 /// };
 /// @endcode
 ///
@@ -103,12 +108,12 @@ class PointPartitioner
 public:
     enum { LOG2DIM = BucketLog2Dim };
 
-    typedef boost::shared_ptr<PointPartitioner>                     Ptr;
-    typedef boost::shared_ptr<const PointPartitioner>               ConstPtr;
+    using Ptr = SharedPtr<PointPartitioner>;
+    using ConstPtr = SharedPtr<const PointPartitioner>;
 
-    typedef PointIndexType                                          IndexType;
-    typedef typename boost::int_t<1 + (3 * BucketLog2Dim)>::least   VoxelOffsetType;
-    typedef boost::scoped_array<VoxelOffsetType>                    VoxelOffsetArray;
+    using IndexType = PointIndexType;
+    using VoxelOffsetType = typename boost::int_t<1 + (3 * BucketLog2Dim)>::least;
+    using VoxelOffsetArray = boost::scoped_array<VoxelOffsetType>;
 
     class IndexIterator;
 
@@ -118,24 +123,32 @@ public:
 
     /// @brief  Partitions point indices into @c BucketLog2Dim aligned buckets.
     ///
-    /// @param points               list of world space points.
-    /// @param xform                world to index space transform.
-    /// @param voxelOrder           sort point indices by local voxel offsets.
-    /// @param recordVoxelOffsets   construct local voxel offsets
+    /// @param points                 list of world space points.
+    /// @param xform                  world to index space transform.
+    /// @param voxelOrder             sort point indices by local voxel offsets.
+    /// @param recordVoxelOffsets     construct local voxel offsets
+    /// @param cellCenteredTransform  toggle the cell-centered interpretation that imagines world
+    ///                               space as divided into discrete cells (e.g., cubes) centered
+    ///                               on the image of the index-space lattice points.
     template<typename PointArray>
     void construct(const PointArray& points, const math::Transform& xform,
-        bool voxelOrder = false, bool recordVoxelOffsets = false);
+        bool voxelOrder = false, bool recordVoxelOffsets = false,
+        bool cellCenteredTransform = true);
 
 
     /// @brief  Partitions point indices into @c BucketLog2Dim aligned buckets.
     ///
-    /// @param points               list of world space points.
-    /// @param xform                world to index space transform.
-    /// @param voxelOrder           sort point indices by local voxel offsets.
-    /// @param recordVoxelOffsets   construct local voxel offsets
+    /// @param points                 list of world space points.
+    /// @param xform                  world to index space transform.
+    /// @param voxelOrder             sort point indices by local voxel offsets.
+    /// @param recordVoxelOffsets     construct local voxel offsets
+    /// @param cellCenteredTransform  toggle the cell-centered interpretation that imagines world
+    ///                               space as divided into discrete cells (e.g., cubes) centered
+    ///                               on the image of the index-space lattice points.
     template<typename PointArray>
     static Ptr create(const PointArray& points, const math::Transform& xform,
-        bool voxelOrder = false, bool recordVoxelOffsets = false);
+        bool voxelOrder = false, bool recordVoxelOffsets = false,
+        bool cellCenteredTransform = true);
 
 
     /// @brief Returns the number of buckets.
@@ -165,6 +178,11 @@ public:
     /// @note   The list is optionally constructed.
     const VoxelOffsetArray&  voxelOffsets() const { return mVoxelOffsets; }
 
+    /// @brief  Returns @c true if this point partitioning was constructed
+    ///         using a cell-centered transform.
+    /// @note   Cell-centered interpretation is the default behavior.
+    bool usingCellCenteredTransform() const { return mUsingCellCenteredTransform; }
+
 private:
     // Disallow copying
     PointPartitioner(const PointPartitioner&);
@@ -176,19 +194,20 @@ private:
     boost::scoped_array<IndexType>  mPageOffsets;
     boost::scoped_array<Coord>      mPageCoordinates;
     IndexType mPageCount;
+    bool      mUsingCellCenteredTransform;
 }; // class PointPartitioner
 
 
-typedef PointPartitioner<uint32_t, 3> UInt32PointPartitioner;
+using UInt32PointPartitioner = PointPartitioner<uint32_t, 3>;
 
 
 template<typename PointIndexType, Index BucketLog2Dim>
 class PointPartitioner<PointIndexType, BucketLog2Dim>::IndexIterator
 {
 public:
-    typedef PointIndexType     IndexType;
+    using IndexType = PointIndexType;
 
-    IndexIterator(IndexType* begin = NULL, IndexType* end = NULL)
+    IndexIterator(IndexType* begin = nullptr, IndexType* end = nullptr)
         : mBegin(begin), mEnd(end), mItem(begin) {}
 
     /// @brief Rewind to first item.
@@ -198,8 +217,8 @@ public:
     size_t size() const { return mEnd - mBegin; }
 
     /// @brief  Returns the item to which this iterator is currently pointing.
-    IndexType& operator*() { assert(mItem != NULL); return *mItem; }
-    const IndexType& operator*() const { assert(mItem != NULL); return *mItem; }
+    IndexType& operator*() { assert(mItem != nullptr); return *mItem; }
+    const IndexType& operator*() const { assert(mItem != nullptr); return *mItem; }
 
     /// @brief  Return @c true if this iterator is not yet exhausted.
     operator bool() const { return mItem < mEnd; }
@@ -280,9 +299,9 @@ struct CreateOrderedPointIndexArrayOp
 template<typename PointIndexType, Index BucketLog2Dim>
 struct VoxelOrderOp
 {
-    typedef typename boost::int_t<1 + (3 * BucketLog2Dim)>::least     VoxelOffsetType;
-    typedef boost::scoped_array<VoxelOffsetType>                VoxelOffsetArray;
-    typedef boost::scoped_array<PointIndexType>                 IndexArray;
+    using VoxelOffsetType = typename boost::int_t<1 + (3 * BucketLog2Dim)>::least;
+    using VoxelOffsetArray = boost::scoped_array<VoxelOffsetType>;
+    using IndexArray = boost::scoped_array<PointIndexType>;
 
     VoxelOrderOp(IndexArray& indices, const IndexArray& pages,const VoxelOffsetArray& offsets)
         : mIndices(indices.get())
@@ -350,38 +369,38 @@ struct VoxelOrderOp
 template<typename PointArray, typename PointIndexType>
 struct LeafNodeOriginOp
 {
-    typedef boost::scoped_array<PointIndexType>     IndexArray;
-    typedef boost::scoped_array<Coord>              CoordArray;
+    using IndexArray = boost::scoped_array<PointIndexType>;
+    using CoordArray = boost::scoped_array<Coord>;
 
     LeafNodeOriginOp(CoordArray& coordinates,
         const IndexArray& indices, const IndexArray& pages,
-        const PointArray& points, const math::Transform& m, int log2dim)
+        const PointArray& points, const math::Transform& m, int log2dim, bool cellCenteredTransform)
         : mCoordinates(coordinates.get())
         , mIndices(indices.get())
         , mPages(pages.get())
         , mPoints(&points)
         , mXForm(m)
         , mLog2Dim(log2dim)
+        , mCellCenteredTransform(cellCenteredTransform)
     {
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        typedef typename PointArray::value_type     PointType;
+        using PosType = typename PointArray::PosType;
 
+        const bool cellCentered = mCellCenteredTransform;
         const int mask = ~((1 << mLog2Dim) - 1);
         Coord ijk;
-        PointType pos;
+        PosType pos;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             mPoints->getPos(mIndices[mPages[n]], pos);
 
-            if (boost::math::isfinite(pos[0]) &&
-                boost::math::isfinite(pos[1]) &&
-                boost::math::isfinite(pos[2])) {
-
-                ijk = mXForm.worldToIndexCellCentered(pos);
+            if (std::isfinite(pos[0]) && std::isfinite(pos[1]) && std::isfinite(pos[2])) {
+                ijk = cellCentered ? mXForm.worldToIndexCellCentered(pos) :
+                    mXForm.worldToIndexNodeCentered(pos);
 
                 ijk[0] &= mask;
                 ijk[1] &= mask;
@@ -398,6 +417,7 @@ struct LeafNodeOriginOp
     PointArray      const * const mPoints;
     math::Transform         const mXForm;
     int                     const mLog2Dim;
+    bool                    const mCellCenteredTransform;
 }; // struct LeafNodeOriginOp
 
 
@@ -407,7 +427,7 @@ struct LeafNodeOriginOp
 template<typename T>
 struct Array
 {
-    typedef boost::shared_ptr<Array> Ptr;
+    using Ptr = SharedPtr<Array>;
 
     Array(size_t size) : mSize(size), mData(new T[size]) { }
 
@@ -427,8 +447,8 @@ private:
 template<typename PointIndexType>
 struct MoveSegmentDataOp
 {
-    typedef Array<PointIndexType>   Segment;
-    typedef typename Segment::Ptr   SegmentPtr;
+    using Segment = Array<PointIndexType>;
+    using SegmentPtr = typename Segment::Ptr;
 
     MoveSegmentDataOp(std::vector<PointIndexType*>& indexLists, SegmentPtr* segments)
         : mIndexLists(&indexLists[0]), mSegments(segments)
@@ -471,14 +491,14 @@ private:
 template<typename PointIndexType>
 struct MergeBinsOp
 {
-    typedef Array<PointIndexType>                       Segment;
-    typedef typename Segment::Ptr                       SegmentPtr;
+    using Segment = Array<PointIndexType>;
+    using SegmentPtr = typename Segment::Ptr;
 
-    typedef std::pair<PointIndexType, PointIndexType>   IndexPair;
-    typedef std::deque<IndexPair>                       IndexPairList;
-    typedef boost::shared_ptr<IndexPairList>            IndexPairListPtr;
-    typedef std::map<Coord, IndexPairListPtr>           IndexPairListMap;
-    typedef boost::shared_ptr<IndexPairListMap>         IndexPairListMapPtr;
+    using IndexPair = std::pair<PointIndexType, PointIndexType>;
+    using IndexPairList = std::deque<IndexPair>;
+    using IndexPairListPtr = SharedPtr<IndexPairList>;
+    using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
+    using IndexPairListMapPtr = SharedPtr<IndexPairListMap>;
 
     MergeBinsOp(IndexPairListMapPtr* bins,
         SegmentPtr* indexSegments,
@@ -556,7 +576,7 @@ private:
 
         void operator()(const tbb::blocked_range<size_t>& range) const {
 
-            typedef typename IndexPairList::const_iterator CIter;
+            using CIter = typename IndexPairList::const_iterator;
 
             for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
@@ -593,14 +613,12 @@ private:
 template<typename PointArray, typename PointIndexType, typename VoxelOffsetType>
 struct BinPointIndicesOp
 {
-    typedef typename PointArray::value_type             PointType;
-    typedef typename PointType::value_type              PointElementType;
-
-    typedef std::pair<PointIndexType, PointIndexType>   IndexPair;
-    typedef std::deque<IndexPair>                       IndexPairList;
-    typedef boost::shared_ptr<IndexPairList>            IndexPairListPtr;
-    typedef std::map<Coord, IndexPairListPtr>           IndexPairListMap;
-    typedef boost::shared_ptr<IndexPairListMap>         IndexPairListMapPtr;
+    using PosType = typename PointArray::PosType;
+    using IndexPair = std::pair<PointIndexType, PointIndexType>;
+    using IndexPairList = std::deque<IndexPair>;
+    using IndexPairListPtr = SharedPtr<IndexPairList>;
+    using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
+    using IndexPairListMapPtr = SharedPtr<IndexPairListMap>;
 
     BinPointIndicesOp(IndexPairListMapPtr* data,
         const PointArray& points,
@@ -608,7 +626,8 @@ struct BinPointIndicesOp
         const math::Transform& m,
         Index binLog2Dim,
         Index bucketLog2Dim,
-        size_t numSegments)
+        size_t numSegments,
+        bool cellCenteredTransform)
         : mData(data)
         , mPoints(&points)
         , mVoxelOffsets(voxelOffsets)
@@ -616,6 +635,7 @@ struct BinPointIndicesOp
         , mBinLog2Dim(binLog2Dim)
         , mBucketLog2Dim(bucketLog2Dim)
         , mNumSegments(numSegments)
+        , mCellCenteredTransform(cellCenteredTransform)
     {
     }
 
@@ -631,12 +651,14 @@ struct BinPointIndicesOp
         const Index binMask = (1u << (log2dim + binLog2dim)) - 1u;
         const Index invBinMask = ~binMask;
 
-        IndexPairList * idxList = NULL;
+        IndexPairList * idxList = nullptr;
         Coord ijk(0, 0, 0), loc(0, 0, 0), binCoord(0, 0, 0), lastBinCoord(1, 2, 3);
-        PointType pos;
+        PosType pos;
 
         PointIndexType bucketOffset = 0;
         VoxelOffsetType voxelOffset = 0;
+
+        const bool cellCentered = mCellCenteredTransform;
 
         const size_t numPoints = mPoints->size();
         const size_t segmentSize = numPoints / mNumSegments;
@@ -656,17 +678,16 @@ struct BinPointIndicesOp
 
                 mPoints->getPos(i, pos);
 
-                if (boost::math::isfinite(pos[0]) &&
-                    boost::math::isfinite(pos[1]) &&
-                    boost::math::isfinite(pos[2])) {
-
-                    ijk = mXForm.worldToIndexCellCentered(pos);
+                if (std::isfinite(pos[0]) && std::isfinite(pos[1]) && std::isfinite(pos[2])) {
+                    ijk = cellCentered ? mXForm.worldToIndexCellCentered(pos) :
+                        mXForm.worldToIndexNodeCentered(pos);
 
                     if (mVoxelOffsets) {
                         loc[0] = ijk[0] & bucketMask;
                         loc[1] = ijk[1] & bucketMask;
                         loc[2] = ijk[2] & bucketMask;
-                        voxelOffset = VoxelOffsetType((loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
+                        voxelOffset = VoxelOffsetType(
+                            (loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
                     }
 
                     binCoord[0] = ijk[0] & invBinMask;
@@ -681,7 +702,8 @@ struct BinPointIndicesOp
                     ijk[1] >>= log2dim;
                     ijk[2] >>= log2dim;
 
-                    bucketOffset = PointIndexType((ijk[0] << binLog2dim2) + (ijk[1] << binLog2dim) + ijk[2]);
+                    bucketOffset = PointIndexType(
+                        (ijk[0] << binLog2dim2) + (ijk[1] << binLog2dim) + ijk[2]);
 
                     if (lastBinCoord != binCoord) {
                         lastBinCoord = binCoord;
@@ -704,14 +726,15 @@ struct BinPointIndicesOp
     Index                        const mBinLog2Dim;
     Index                        const mBucketLog2Dim;
     size_t                       const mNumSegments;
+    bool                         const mCellCenteredTransform;
 }; // struct BinPointIndicesOp
 
 
 template<typename PointIndexType>
 struct OrderSegmentsOp
 {
-    typedef boost::scoped_array<PointIndexType>     IndexArray;
-    typedef typename Array<PointIndexType>::Ptr     SegmentPtr;
+    using IndexArray = boost::scoped_array<PointIndexType>;
+    using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
     OrderSegmentsOp(SegmentPtr* indexSegments, SegmentPtr* offestSegments,
         IndexArray* pageOffsetArrays, Index binVolume)
@@ -804,13 +827,14 @@ inline void binAndSegment(
     size_t& segmentCount,
     const Index binLog2Dim,
     const Index bucketLog2Dim,
-    VoxelOffsetType* voxelOffsets = NULL)
+    VoxelOffsetType* voxelOffsets = nullptr,
+    bool cellCenteredTransform = true)
 {
-    typedef std::pair<PointIndexType, PointIndexType>   IndexPair;
-    typedef std::deque<IndexPair>                       IndexPairList;
-    typedef boost::shared_ptr<IndexPairList>            IndexPairListPtr;
-    typedef std::map<Coord, IndexPairListPtr>           IndexPairListMap;
-    typedef boost::shared_ptr<IndexPairListMap>         IndexPairListMapPtr;
+    using IndexPair = std::pair<PointIndexType, PointIndexType>;
+    using IndexPairList = std::deque<IndexPair>;
+    using IndexPairListPtr = SharedPtr<IndexPairList>;
+    using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
+    using IndexPairListMapPtr = SharedPtr<IndexPairListMap>;
 
     size_t numTasks = 1, numThreads = size_t(tbb::task_scheduler_init::default_num_threads());
     if (points.size() > (numThreads * 2)) numTasks = numThreads * 2;
@@ -818,10 +842,11 @@ inline void binAndSegment(
 
     boost::scoped_array<IndexPairListMapPtr> bins(new IndexPairListMapPtr[numTasks]);
 
-    typedef BinPointIndicesOp<PointArray, PointIndexType, VoxelOffsetType> BinOp;
+    using BinOp = BinPointIndicesOp<PointArray, PointIndexType, VoxelOffsetType>;
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, numTasks),
-        BinOp(bins.get(), points, voxelOffsets, xform, binLog2Dim, bucketLog2Dim, numTasks));
+        BinOp(bins.get(), points, voxelOffsets, xform, binLog2Dim, bucketLog2Dim,
+            numTasks, cellCenteredTransform));
 
     std::set<Coord> uniqueCoords;
 
@@ -837,12 +862,12 @@ inline void binAndSegment(
 
     segmentCount = coords.size();
 
-    typedef typename Array<PointIndexType>::Ptr SegmentPtr;
+    using SegmentPtr = typename Array<PointIndexType>::Ptr;
 
     indexSegments.reset(new SegmentPtr[segmentCount]);
     offsetSegments.reset(new SegmentPtr[segmentCount]);
 
-    typedef MergeBinsOp<PointIndexType> MergeOp;
+    using MergeOp = MergeBinsOp<PointIndexType>;
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, segmentCount),
         MergeOp(bins.get(), indexSegments.get(), offsetSegments.get(), &coords[0], numTasks));
@@ -858,7 +883,8 @@ inline void partition(
     boost::scoped_array<PointIndexType>& pageOffsets,
     PointIndexType& pageCount,
     boost::scoped_array<VoxelOffsetType>& voxelOffsets,
-    bool recordVoxelOffsets)
+    bool recordVoxelOffsets,
+    bool cellCenteredTransform)
 {
     if (recordVoxelOffsets) voxelOffsets.reset(new VoxelOffsetType[points.size()]);
     else  voxelOffsets.reset();
@@ -875,11 +901,12 @@ inline void partition(
     boost::scoped_array<typename Array<PointIndexType>::Ptr> offestSegments;
 
     binAndSegment<PointIndexType, VoxelOffsetType, PointArray>(points, xform,
-        indexSegments, offestSegments, numSegments, binLog2Dim, bucketLog2Dim, voxelOffsets.get());
+        indexSegments, offestSegments, numSegments, binLog2Dim, bucketLog2Dim,
+            voxelOffsets.get(), cellCenteredTransform);
 
     const tbb::blocked_range<size_t> segmentRange(0, numSegments);
 
-    typedef boost::scoped_array<PointIndexType> IndexArray;
+    using IndexArray = boost::scoped_array<PointIndexType>;
     boost::scoped_array<IndexArray> pageOffsetArrays(new IndexArray[numSegments]);
 
     const Index binVolume = 1u << (3u * binLog2Dim);
@@ -921,7 +948,8 @@ inline void partition(
         index += offestSegments[n]->size();
     }
 
-    tbb::parallel_for(segmentRange, MoveSegmentDataOp<PointIndexType>(indexArray, offestSegments.get()));
+    tbb::parallel_for(segmentRange,
+        MoveSegmentDataOp<PointIndexType>(indexArray, offestSegments.get()));
 }
 
 
@@ -933,11 +961,12 @@ inline void partition(
 
 template<typename PointIndexType, Index BucketLog2Dim>
 inline PointPartitioner<PointIndexType, BucketLog2Dim>::PointPartitioner()
-    : mPointIndices(NULL)
-    , mVoxelOffsets(NULL)
-    , mPageOffsets(NULL)
-    , mPageCoordinates(NULL)
+    : mPointIndices(nullptr)
+    , mVoxelOffsets(nullptr)
+    , mPageOffsets(nullptr)
+    , mPageCoordinates(nullptr)
     , mPageCount(0)
+    , mUsingCellCenteredTransform(true)
 {
 }
 
@@ -947,6 +976,7 @@ inline void
 PointPartitioner<PointIndexType, BucketLog2Dim>::clear()
 {
     mPageCount = 0;
+    mUsingCellCenteredTransform = true;
     mPointIndices.reset();
     mVoxelOffsets.reset();
     mPageOffsets.reset();
@@ -966,6 +996,10 @@ PointPartitioner<PointIndexType, BucketLog2Dim>::swap(PointPartitioner& rhs)
     mVoxelOffsets.swap(rhs.mVoxelOffsets);
     mPageOffsets.swap(rhs.mPageOffsets);
     mPageCoordinates.swap(rhs.mPageCoordinates);
+
+    bool lhsCellCenteredTransform = mUsingCellCenteredTransform;
+    mUsingCellCenteredTransform = rhs.mUsingCellCenteredTransform;
+    rhs.mUsingCellCenteredTransform = lhsCellCenteredTransform;
 }
 
 
@@ -983,18 +1017,26 @@ PointPartitioner<PointIndexType, BucketLog2Dim>::indices(size_t n) const
 template<typename PointIndexType, Index BucketLog2Dim>
 template<typename PointArray>
 inline void
-PointPartitioner<PointIndexType, BucketLog2Dim>::construct(const PointArray& points,
-    const math::Transform& xform, bool voxelOrder, bool recordVoxelOffsets)
+PointPartitioner<PointIndexType, BucketLog2Dim>::construct(
+    const PointArray& points,
+    const math::Transform& xform,
+    bool voxelOrder,
+    bool recordVoxelOffsets,
+    bool cellCenteredTransform)
 {
+    mUsingCellCenteredTransform = cellCenteredTransform;
+
     point_partitioner_internal::partition(points, xform, BucketLog2Dim,
-        mPointIndices, mPageOffsets, mPageCount, mVoxelOffsets, (voxelOrder || recordVoxelOffsets));
+        mPointIndices, mPageOffsets, mPageCount, mVoxelOffsets,
+            (voxelOrder || recordVoxelOffsets), cellCenteredTransform);
 
     const tbb::blocked_range<size_t> pageRange(0, mPageCount);
     mPageCoordinates.reset(new Coord[mPageCount]);
 
     tbb::parallel_for(pageRange,
         point_partitioner_internal::LeafNodeOriginOp<PointArray, IndexType>
-            (mPageCoordinates, mPointIndices, mPageOffsets, points, xform, BucketLog2Dim));
+            (mPageCoordinates, mPointIndices, mPageOffsets, points, xform,
+                BucketLog2Dim, cellCenteredTransform));
 
     if (mVoxelOffsets && voxelOrder) {
         tbb::parallel_for(pageRange, point_partitioner_internal::VoxelOrderOp<
@@ -1010,11 +1052,15 @@ PointPartitioner<PointIndexType, BucketLog2Dim>::construct(const PointArray& poi
 template<typename PointIndexType, Index BucketLog2Dim>
 template<typename PointArray>
 inline typename PointPartitioner<PointIndexType, BucketLog2Dim>::Ptr
-PointPartitioner<PointIndexType, BucketLog2Dim>::create(const PointArray& points, const math::Transform& xform,
-     bool voxelOrder, bool recordVoxelOffsets)
+PointPartitioner<PointIndexType, BucketLog2Dim>::create(
+    const PointArray& points,
+    const math::Transform& xform,
+    bool voxelOrder,
+    bool recordVoxelOffsets,
+    bool cellCenteredTransform)
 {
     Ptr ret(new PointPartitioner());
-    ret->construct(points, xform, voxelOrder, recordVoxelOffsets);
+    ret->construct(points, xform, voxelOrder, recordVoxelOffsets, cellCenteredTransform);
     return ret;
 }
 
@@ -1029,6 +1075,6 @@ PointPartitioner<PointIndexType, BucketLog2Dim>::create(const PointArray& points
 
 #endif // OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
