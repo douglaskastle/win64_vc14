@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,10 +42,10 @@
 
 #include <algorithm>
 #include <vector>
-#include <openvdb/math/Math.h>             // for Pow2, needed by WENO and  Gudonov
+#include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
 #include <openvdb/math/Coord.h>            // for Coord
-#include <openvdb/math/FiniteDifference.h> // for WENO5 and GudonovsNormSqrd
+#include <openvdb/math/FiniteDifference.h> // for WENO5 and GodunovsNormSqrd
 #include <openvdb/tree/ValueAccessor.h>
 
 namespace openvdb {
@@ -55,7 +55,7 @@ namespace math {
 
 
 ////////////////////////////////////////
-    
+
 template<typename DerivedType, typename GridT, bool IsSafe>
 class BaseStencil
 {
@@ -108,7 +108,8 @@ public:
     /// @details This method will check to see if it is necessary to
     /// update the stencil based on the cached index coordinates of
     /// the center point.
-    inline void moveTo(const Vec3R& xyz)
+    template<typename RealType>
+    inline void moveTo(const Vec3<RealType>& xyz)
     {
         Coord ijk = openvdb::Coord::floor(xyz);
         if (ijk != mCenter) this->moveTo(ijk);
@@ -247,7 +248,7 @@ public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
     typedef typename GridT::ValueType         ValueType;
-    
+
     static const int SIZE = 7;
 
     SevenPointStencil(const GridT& grid): BaseType(grid, SIZE) {}
@@ -301,7 +302,7 @@ public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
     typedef typename GridT::ValueType         ValueType;
-    
+
     static const int SIZE = 8;
 
     BoxStencil(const GridType& grid): BaseType(grid, SIZE) {}
@@ -333,9 +334,9 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline ValueType interpolation(const math::Vec3<ValueType>& xyz) const
     {
-        const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
+        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
+        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
 
         ValueType V = BaseType::template getValue<0,0,0>();
         ValueType A = static_cast<ValueType>(V + (BaseType::template getValue<0,0,1>() - V) * w);
@@ -361,9 +362,9 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& xyz) const
     {
-        const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
+        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
+        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
 
         ValueType D[4]={BaseType::template getValue<0,0,1>()-BaseType::template getValue<0,0,0>(),
                         BaseType::template getValue<0,1,1>()-BaseType::template getValue<0,1,0>(),
@@ -1193,6 +1194,18 @@ private:
 
 //////////////////////////////////////////////////////////////////////
 
+namespace { // anonymous namespace for stencil-layout map
+
+    // the seven point stencil with a different layout from SevenPt
+    template<int i, int j, int k> struct GradPt {};
+    template<> struct GradPt< 0, 0, 0> { enum { idx = 0 }; };
+    template<> struct GradPt< 1, 0, 0> { enum { idx = 2 }; };
+    template<> struct GradPt< 0, 1, 0> { enum { idx = 4 }; };
+    template<> struct GradPt< 0, 0, 1> { enum { idx = 6 }; };
+    template<> struct GradPt<-1, 0, 0> { enum { idx = 1 }; };
+    template<> struct GradPt< 0,-1, 0> { enum { idx = 3 }; };
+    template<> struct GradPt< 0, 0,-1> { enum { idx = 5 }; };
+}
 
 /// This is a simple 7-point nearest neighbor stencil that supports
 /// gradient by second-order central differencing, first-order upwinding,
@@ -1227,13 +1240,13 @@ public:
     }
 
     /// @brief Return the norm square of the single-sided upwind gradient
-    /// (computed via Gudonov's scheme) at the previously buffered location.
+    /// (computed via Godunov's scheme) at the previously buffered location.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType normSqGrad() const
     {
-        return mInvDx2 * math::GudonovsNormSqrd(mStencil[0] > 0,
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > zeroVal<ValueType>(),
                                                 mStencil[0] - mStencil[1],
                                                 mStencil[2] - mStencil[0],
                                                 mStencil[0] - mStencil[3],
@@ -1299,20 +1312,24 @@ public:
                                      ijk[2] - d*(mStencil[6] - mStencil[5]));
     }
 
+    /// Return linear offset for the specified stencil point relative to its center
+    template<int i, int j, int k>
+    unsigned int pos() const { return GradPt<i,j,k>::idx; }
+    
 private:
-
+    
     inline void init(const Coord& ijk)
     {
-        mStencil[1] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
-        mStencil[2] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
+        BaseType::template setValue<-1, 0, 0>(mCache.getValue(ijk.offsetBy(-1, 0, 0)));
+        BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
 
-        mStencil[3] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
-        mStencil[4] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
+        BaseType::template setValue< 0,-1, 0>(mCache.getValue(ijk.offsetBy( 0,-1, 0)));
+        BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
 
-        mStencil[5] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
-        mStencil[6] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
+        BaseType::template setValue< 0, 0,-1>(mCache.getValue(ijk.offsetBy( 0, 0,-1)));
+        BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
     }
-
+    
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
@@ -1356,11 +1373,11 @@ public:
     }
 
     /// @brief Return the norm-square of the WENO upwind gradient (computed via
-    /// WENO upwinding and Gudonov's scheme) at the previously buffered location.
+    /// WENO upwinding and Godunov's scheme) at the previously buffered location.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline ValueType normSqGrad() const
+    inline ValueType normSqGrad(const ValueType &isoValue = zeroVal<ValueType>()) const
     {
         const typename BaseType::BufferType& v = mStencil;
 #ifdef DWA_OPENVDB
@@ -1375,7 +1392,7 @@ public:
             dP_m = math::WENO5(v1, v2, v3, v4, v5, mDx2),
             dP_p = math::WENO5(v6, v5, v4, v3, v2, mDx2);
 
-        return mInvDx2 * math::GudonovsNormSqrd(mStencil[0] > 0, dP_m, dP_p);
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > isoValue, dP_m, dP_p);
 #else
         const Real
             dP_xm = math::WENO5(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3],v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2),
@@ -1385,7 +1402,7 @@ public:
             dP_zm = math::WENO5(v[14]-v[13],v[15]-v[14],v[ 0]-v[15],v[16]-v[ 0],v[17]-v[16],mDx2),
             dP_zp = math::WENO5(v[18]-v[17],v[17]-v[16],v[16]-v[ 0],v[ 0]-v[15],v[15]-v[14],mDx2);
         return static_cast<ValueType>(
-            mInvDx2*math::GudonovsNormSqrd(v[0]>0,dP_xm,dP_xp,dP_ym,dP_yp,dP_zm,dP_zp));
+            mInvDx2*math::GodunovsNormSqrd(v[0]>isoValue, dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp));
 #endif
     }
 
@@ -1675,6 +1692,6 @@ private:
 
 #endif // OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

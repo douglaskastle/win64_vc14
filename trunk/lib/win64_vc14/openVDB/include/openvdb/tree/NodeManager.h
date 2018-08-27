@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,8 +27,8 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
-/// @file NodeManager.h
+
+/// @file tree/NodeManager.h
 ///
 /// @author Ken Museth
 ///
@@ -41,9 +41,11 @@
 #ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_for.h>
 #include <openvdb/Types.h>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
 #include <deque>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -66,8 +68,8 @@ template<typename NodeT>
 class NodeList
 {
 public:
-    typedef NodeT* value_type;
-    typedef std::deque<value_type> ListT;
+    using value_type = NodeT*;
+    using ListT = std::deque<value_type>;
 
     NodeList() {}
 
@@ -111,10 +113,8 @@ public:
             {
                 assert(this->isValid());
             }
-            Iterator& operator=(const Iterator& other)
-            {
-                mRange = other.mRange; mPos = other.mPos; return *this;
-            }
+            Iterator(const Iterator&) = default;
+            Iterator& operator=(const Iterator&) = default;
             /// Advance to the next node.
             Iterator& operator++() { ++mPos; return *this; }
             /// Return a reference to the node to which this iterator is pointing.
@@ -166,9 +166,28 @@ public:
     }
 
     template<typename NodeOp>
+    void foreach(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        NodeTransformer<NodeOp> transform(op);
+        transform.run(this->nodeRange(grainSize), threaded);
+    }
+
+    template<typename NodeOp>
+    void reduce(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        NodeReducer<NodeOp> transform(op);
+        transform.run(this->nodeRange(grainSize), threaded);
+    }
+
+private:
+
+    // Private struct of NodeList that performs parallel_for
+    template<typename NodeOp>
     struct NodeTransformer
     {
-        NodeTransformer(const NodeOp& nodeOp) : mNodeOp(nodeOp) {}
+        NodeTransformer(const NodeOp& nodeOp) : mNodeOp(nodeOp)
+        {
+        }
         void run(const NodeRange& range, bool threaded = true)
         {
             threaded ? tbb::parallel_for(range, *this) : (*this)(range);
@@ -178,14 +197,37 @@ public:
             for (typename NodeRange::Iterator it = range.begin(); it; ++it) mNodeOp(*it);
         }
         const NodeOp mNodeOp;
-    };// NodeRange
+    };// NodeList::NodeTransformer
 
+    // Private struct of NodeList that performs parallel_reduce
     template<typename NodeOp>
-    void foreach(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    struct NodeReducer
     {
-        NodeTransformer<NodeOp> transform(op);
-        transform.run(this->nodeRange(grainSize), threaded);
-    }
+        NodeReducer(NodeOp& nodeOp) : mNodeOp(&nodeOp), mOwnsOp(false)
+        {
+        }
+        NodeReducer(const NodeReducer& other, tbb::split) :
+            mNodeOp(new NodeOp(*(other.mNodeOp), tbb::split())), mOwnsOp(true)
+        {
+        }
+        ~NodeReducer() { if (mOwnsOp) delete mNodeOp; }
+        void run(const NodeRange& range, bool threaded = true)
+        {
+            threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
+        }
+        void operator()(const NodeRange& range)
+        {
+            NodeOp &op = *mNodeOp;
+            for (typename NodeRange::Iterator it = range.begin(); it; ++it) op(*it);
+        }
+        void join(const NodeReducer& other)
+        {
+            mNodeOp->join(*(other.mNodeOp));
+        }
+        NodeOp *mNodeOp;
+        const bool mOwnsOp;
+    };// NodeList::NodeReducer
+
 
 protected:
     ListT mList;
@@ -232,17 +274,31 @@ public:
     }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
     {
-        mNext.processBottomUp(op, threaded, grainSize);
+        mNext.foreachBottomUp(op, threaded, grainSize);
         mList.foreach(op, threaded, grainSize);
     }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachTopDown(const NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
-        mNext.processTopDown(op, threaded, grainSize);
+        mNext.foreachTopDown(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mNext.reduceBottomUp(op, threaded, grainSize);
+        mList.reduce(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.reduce(op, threaded, grainSize);
+        mNext.reduceTopDown(op, threaded, grainSize);
     }
 
 protected:
@@ -254,8 +310,8 @@ protected:
 ////////////////////////////////////////
 
 
+/// @private
 /// @brief Specialization that terminates the chain of cached tree nodes
-///
 /// @note It is for internal use and should rarely be used directly.
 template<typename NodeT>
 class NodeManagerLink<NodeT, 0>
@@ -276,15 +332,27 @@ public:
     Index64 nodeCount(Index) const { return mList.nodeCount(); }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
     }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool threaded, size_t grainSize)
+    void foreachTopDown(const NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.reduce(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.reduce(op, threaded, grainSize);
     }
 
     template<typename ParentT, typename TreeOrLeafManagerT>
@@ -316,9 +384,10 @@ class NodeManager
 {
 public:
     static const Index LEVELS = _LEVELS;
-    BOOST_STATIC_ASSERT(LEVELS > 0);//special implementation below
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL >= LEVELS);
+    static_assert(LEVELS > 0,
+        "expected instantiation of template specialization"); // see specialization below
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot, tree); }
 
@@ -360,9 +429,9 @@ public:
     /// template<typename TreeType>
     /// struct OffsetOp
     /// {
-    ///     typedef typename TreeT::ValueType    ValueT;
-    ///     typedef typename TreeT::RootNodeType RootT;
-    ///     typedef typename TreeT::LeafNodeType LeafT;
+    ///     using ValueT = typename TreeT::ValueType;
+    ///     using RootT = typename TreeT::RootNodeType;
+    ///     using LeafT = typename TreeT::LeafNodeType;
     ///     OffsetOp(const ValueT& v) : mOffset(v) {}
     ///
     ///     // Processes the root node. Required by the NodeManager
@@ -386,29 +455,103 @@ public:
     /// };
     ///
     /// // usage:
-    /// OffsetOp<FloatTree> op(tree);
+    /// OffsetOp<FloatTree> op(3.0f);
     /// tree::NodeManager<FloatTree> nodes(tree);
-    /// nodes.processBottomUp(op);
+    /// nodes.foreachBottomUp(op);
     ///
-    /// // or for better performance
-    /// typedef tree::LeafManager<FloatTree> T;
-    /// OffsetOp<T> op(leafManager);
+    /// // or if a LeafManager already exists
+    /// using T = tree::LeafManager<FloatTree>;
+    /// OffsetOp<T> op(3.0f);
     /// tree::NodeManager<T> nodes(leafManager);
-    /// nodes.processBottomUp(op);
+    /// nodes.foreachBottomUp(op);
     ///
     /// @endcode
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
-        mChain.processBottomUp(op, threaded, grainSize);
+        mChain.foreachBottomUp(op, threaded, grainSize);
         op(mRoot);
     }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
-        mChain.processTopDown(op, threaded, grainSize);
+        mChain.foreachTopDown(op, threaded, grainSize);
+    }
+
+    //@}
+
+    //@{
+    /// @brief   Threaded method that processes nodes with a user supplied functor
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @warning The functor object is deep-copied to create TBB tasks.
+    ///
+    /// @par Example:
+    /// @code
+    ///  // Functor to count nodes in a tree
+    ///  template<typename TreeType>
+    ///  struct NodeCountOp
+    ///  {
+    ///      NodeCountOp() : nodeCount(TreeType::DEPTH, 0), totalCount(0)
+    ///      {
+    ///      }
+    ///      NodeCountOp(const NodeCountOp& other, tbb::split) :
+    ///          nodeCount(TreeType::DEPTH, 0), totalCount(0)
+    ///      {
+    ///      }
+    ///      void join(const NodeCountOp& other)
+    ///      {
+    ///          for (size_t i = 0; i < nodeCount.size(); ++i) {
+    ///              nodeCount[i] += other.nodeCount[i];
+    ///          }
+    ///          totalCount += other.totalCount;
+    ///      }
+    ///      // do nothing for the root node
+    ///      void operator()(const typename TreeT::RootNodeType& node)
+    ///      {
+    ///      }
+    ///      // count the internal and leaf nodes
+    ///      template<typename NodeT>
+    ///      void operator()(const NodeT& node)
+    ///      {
+    ///          ++(nodeCount[NodeT::LEVEL]);
+    ///          ++totalCount;
+    ///      }
+    ///      std::vector<openvdb::Index64> nodeCount;
+    ///      openvdb::Index64 totalCount;
+    /// };
+    ///
+    /// // usage:
+    /// NodeCountOp<FloatTree> op;
+    /// tree::NodeManager<FloatTree> nodes(tree);
+    /// nodes.reduceBottomUp(op);
+    ///
+    /// // or if a LeafManager already exists
+    /// NodeCountOp<FloatTree> op;
+    /// using T = tree::LeafManager<FloatTree>;
+    /// T leafManager(tree);
+    /// tree::NodeManager<T> nodes(leafManager);
+    /// nodes.reduceBottomUp(op);
+    ///
+    /// @endcode
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mChain.reduceBottomUp(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mChain.reduceTopDown(op, threaded, grainSize);
     }
     //@}
 
@@ -424,12 +567,13 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with no caching of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 0>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
     static const Index LEVELS = 0;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
@@ -452,10 +596,16 @@ public:
     Index64 nodeCount(Index) const { return 0; }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool, size_t) { op(mRoot); }
+    void foreachBottomUp(const NodeOp& op, bool, size_t) { op(mRoot); }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool, size_t) { op(mRoot); }
+    void foreachTopDown(const NodeOp& op, bool, size_t) { op(mRoot); }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool, size_t) { op(mRoot); }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool, size_t) { op(mRoot); }
 
 protected:
     RootNodeType& mRoot;
@@ -468,13 +618,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with one level of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 1>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 0);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -508,23 +659,37 @@ public:
     Index64 nodeCount(Index i) const { return i==0 ? mList0.nodeCount() : 0; }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.foreach(op, threaded, grainSize);
         op(mRoot);
     }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
         mList0.foreach(op, threaded, grainSize);
     }
 
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList0.reduce(op, threaded, grainSize);
+    }
+
 protected:
-    typedef RootNodeType                   NodeT1;
-    typedef typename NodeT1::ChildNodeType NodeT0;
-    typedef NodeList<NodeT0>               ListT0;
+    using NodeT1 = RootNodeType;
+    using NodeT0 = typename NodeT1::ChildNodeType;
+    using ListT0 = NodeList<NodeT0>;
 
     NodeT1& mRoot;
     ListT0 mList0;
@@ -537,13 +702,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with two levels of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 2>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 1);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -587,7 +753,7 @@ public:
     }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
@@ -595,20 +761,36 @@ public:
     }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
         mList1.foreach(op, threaded, grainSize);
         mList0.foreach(op, threaded, grainSize);
     }
 
-protected:
-    typedef RootNodeType                   NodeT2;
-    typedef typename NodeT2::ChildNodeType NodeT1;//upper level
-    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
 
-    typedef NodeList<NodeT1>               ListT1;//upper level
-    typedef NodeList<NodeT0>               ListT0;//lower level
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList1.reduce(op, threaded, grainSize);
+        mList0.reduce(op, threaded, grainSize);
+    }
+
+protected:
+    using NodeT2 = RootNodeType;
+    using NodeT1 = typename NodeT2::ChildNodeType; // upper level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+
+    using ListT1 = NodeList<NodeT1>; // upper level
+    using ListT0 = NodeList<NodeT0>; // lower level
 
     NodeT2& mRoot;
     ListT1 mList1;
@@ -622,13 +804,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with three levels of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 3>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 2);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -675,7 +858,7 @@ public:
     }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
@@ -684,7 +867,7 @@ public:
     }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
         mList2.foreach(op, threaded, grainSize);
@@ -692,15 +875,33 @@ public:
         mList0.foreach(op, threaded, grainSize);
     }
 
-protected:
-    typedef RootNodeType                   NodeT3;
-    typedef typename NodeT3::ChildNodeType NodeT2;//upper level
-    typedef typename NodeT2::ChildNodeType NodeT1;//mid level
-    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList2.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
 
-    typedef NodeList<NodeT2>               ListT2;//upper level of internal nodes
-    typedef NodeList<NodeT1>               ListT1;//lower level of internal nodes
-    typedef NodeList<NodeT0>               ListT0;//lower level of internal nodes or leafs
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList2.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList0.reduce(op, threaded, grainSize);
+    }
+
+protected:
+    using NodeT3 = RootNodeType;
+    using NodeT2 = typename NodeT3::ChildNodeType; // upper level
+    using NodeT1 = typename NodeT2::ChildNodeType; // mid level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+
+    using ListT2 = NodeList<NodeT2>; // upper level of internal nodes
+    using ListT1 = NodeList<NodeT1>; // lower level of internal nodes
+    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
 
     NodeT3& mRoot;
     ListT2 mList2;
@@ -715,13 +916,14 @@ private:
 ////////////////////////////////////////////
 
 
+/// @private
 /// Template specialization of the NodeManager with four levels of nodes
 template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 4>
 {
 public:
-    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 3);
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
@@ -774,7 +976,7 @@ public:
     }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
@@ -784,7 +986,7 @@ public:
     }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
         mList3.foreach(op, threaded, grainSize);
@@ -793,17 +995,37 @@ public:
         mList0.foreach(op, threaded, grainSize);
     }
 
-protected:
-    typedef RootNodeType                   NodeT4;
-    typedef typename NodeT4::ChildNodeType NodeT3;//upper level
-    typedef typename NodeT3::ChildNodeType NodeT2;//upper mid level
-    typedef typename NodeT2::ChildNodeType NodeT1;//lower mid level
-    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList2.reduce(op, threaded, grainSize);
+        mList3.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
 
-    typedef NodeList<NodeT3>               ListT3;//upper level of internal nodes
-    typedef NodeList<NodeT2>               ListT2;//upper mid level of internal nodes
-    typedef NodeList<NodeT1>               ListT1;//lower mid level of internal nodes
-    typedef NodeList<NodeT0>               ListT0;//lower level of internal nodes or leafs
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList3.reduce(op, threaded, grainSize);
+        mList2.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList0.reduce(op, threaded, grainSize);
+    }
+
+protected:
+    using NodeT4 = RootNodeType;
+    using NodeT3 = typename NodeT4::ChildNodeType; // upper level
+    using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
+    using NodeT1 = typename NodeT2::ChildNodeType; // lower mid level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+
+    using ListT3 = NodeList<NodeT3>; // upper level of internal nodes
+    using ListT2 = NodeList<NodeT2>; // upper mid level of internal nodes
+    using ListT1 = NodeList<NodeT1>; // lower mid level of internal nodes
+    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
 
     NodeT4& mRoot;
     ListT3  mList3;
@@ -821,6 +1043,6 @@ private:
 
 #endif // OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

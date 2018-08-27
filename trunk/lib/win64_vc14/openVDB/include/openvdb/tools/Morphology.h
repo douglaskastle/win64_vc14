@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -52,10 +52,14 @@
 #include <openvdb/tree/TreeIterator.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
-#include <boost/scoped_array.hpp>
-#include <boost/bind.hpp>
 #include "Prune.h"// for pruneLevelSet
 #include "ValueTransformer.h" // for foreach()
+#include <tbb/tbb_thread.h>
+#include <tbb/task_scheduler_init.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/parallel_for.h>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -80,9 +84,76 @@ namespace tools {
 /// </dl>
 enum NearestNeighbors { NN_FACE = 6, NN_FACE_EDGE = 18, NN_FACE_EDGE_VERTEX = 26 };
 
+/// @brief Different policies when dilating trees with active tiles
+/// @details
+/// <dl>
+/// <dt><b>IGNORE_TILES</b>
+/// <dd>Active tiles are ignores, i.e. only active voxels are dilates.
+///
+/// <dt><b>EXPAND_TILES</b>
+/// <dd>Active tiles are expanded into active voxels and then dilated.
+///
+/// <dt><b>PRESERVE_TILES</b>
+/// <dd>Active tiles remain unchanged but they still contribute to the
+/// dilation as if they were active voxels.
+/// </dl>
+enum TilePolicy { IGNORE_TILES, EXPAND_TILES, PRESERVE_TILES };
+
+/// @brief Topologically dilate all active values (i.e. both voxels
+/// and tiles) in a tree using one of three nearest neighbor
+/// connectivity patterns.
+/// @note This method is fully multi-threaded and support active tiles!
+///
+/// @param tree          tree to be dilated
+/// @param iterations    number of iterations to apply the dilation
+/// @param nn            connectivity pattern of the dilation: either
+///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
+///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
+///     nearest neighbors).
+/// @param mode          Defined the policy for handling active tiles
+///                      (see above for details)
+///
+/// @note The values of any voxels are unchanged.
+template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+inline void dilateActiveValues(TreeType& tree,
+                               int iterations = 1,
+                               NearestNeighbors nn = NN_FACE,
+                               TilePolicy mode = PRESERVE_TILES);
+
+/// @brief Topologically dilate all active values (i.e. both voxels
+/// and tiles) in a tree using one of three nearest neighbor
+/// connectivity patterns.
+///
+/// @warning Unlike the method above this one takes a LeafManger,
+/// however (unlike dilateVoxels method below) it offers no performance
+/// advantage over the one that takes a tree. Its merely included for
+/// API compatability. The leaf nodes in the manger are updated
+/// after the dilation, which incurres a (very small) overhead.
+///
+/// @note This method is fully multi-threaded and support active tiles!
+///
+/// @param manager       Leaf node manager for the tree to be dilated.
+///                      On exit it is updated to include all the leaf
+///                      nodes of the dilated tree.
+/// @param iterations    number of iterations to apply the dilation
+/// @param nn            connectivity pattern of the dilation: either
+///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
+///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
+///     nearest neighbors).
+/// @param mode          Defined the policy for handling active tiles
+///                      (see above for details)
+///
+/// @note The values of any voxels are unchanged.
+template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+inline void dilateActiveValues(tree::LeafManager<TreeType>& manager,
+                               int iterations = 1,
+                               NearestNeighbors nn = NN_FACE,
+                               TilePolicy mode = PRESERVE_TILES);
+
 
 /// @brief Topologically dilate all leaf-level active voxels in a tree
 /// using one of three nearest neighbor connectivity patterns.
+/// @warning This method is NOT multi-threaded and ignores active tiles!
 ///
 /// @param tree          tree to be dilated
 /// @param iterations    number of iterations to apply the dilation
@@ -92,7 +163,6 @@ enum NearestNeighbors { NN_FACE = 6, NN_FACE_EDGE = 18, NN_FACE_EDGE_VERTEX = 26
 ///     nearest neighbors).
 ///
 /// @note The values of any voxels are unchanged.
-/// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
 inline void dilateVoxels(TreeType& tree,
                          int iterations = 1,
@@ -100,8 +170,11 @@ inline void dilateVoxels(TreeType& tree,
 
 /// @brief Topologically dilate all leaf-level active voxels in a tree
 /// using one of three nearest neighbor connectivity patterns.
+/// @warning This method is NOT multi-threaded and ignores active tiles!
 ///
 /// @param manager       LeafManager containing the tree to be dilated.
+///                      On exit it is updated to include all the leaf
+///                      nodes of the dilated tree.
 /// @param iterations    number of iterations to apply the dilation
 /// @param nn           connectivity pattern of the dilation: either
 ///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
@@ -109,7 +182,6 @@ inline void dilateVoxels(TreeType& tree,
 ///     nearest neighbors).
 ///
 /// @note The values of any voxels are unchanged.
-/// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
 inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
                          int iterations = 1,
@@ -221,8 +293,8 @@ protected:
         LeafType* leaf;//null if a tile
         bool      init;//true if initialization is required
         bool      isOn;//true if an active tile
-        Neighbor() : leaf(NULL), init(true) {}
-        inline void clear() { leaf = NULL; init = true; }
+        Neighbor() : leaf(nullptr), init(true) {}
+        inline void clear() { leaf = nullptr; init = true; }
         template<int DX, int DY, int DZ>
         void scatter(AccessorType& acc, const Coord &xyz, int indx, Word mask)
         {
@@ -230,7 +302,7 @@ protected:
                 init = false;
                 Coord orig = xyz.offsetBy(DX*LEAF_DIM, DY*LEAF_DIM, DZ*LEAF_DIM);
                 leaf = acc.probeLeaf(orig);
-                if (leaf==NULL && !acc.isValueOn(orig)) leaf = acc.touchLeaf(orig);
+                if ((leaf == nullptr) && !acc.isValueOn(orig)) leaf = acc.touchLeaf(orig);
             }
 #ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
             static
@@ -266,7 +338,7 @@ protected:
         }
         ~LeafCache() { delete [] leafs; }
         LeafType*& operator[](int offset) { return leafs[offset]; }
-        inline void clear() { for (size_t i=0; i<size; ++i) leafs[i]=NULL; }
+        inline void clear() { for (size_t i = 0; i < size; ++i) leafs[i] = nullptr; }
         inline void setOrigin(const Coord& xyz) { origin = &xyz; }
         inline void scatter(int n, int indx)
         {
@@ -326,7 +398,7 @@ protected:
         void erode18(const RangeT&) const;
         void erode26(const RangeT&) const;
     private:
-        typedef typename boost::function<void (ErodeVoxelsOp*, const RangeT&)> FuncT;
+        using FuncT = typename std::function<void (ErodeVoxelsOp*, const RangeT&)>;
         FuncT                  mTask;
         std::vector<MaskType>& mSavedMasks;
         ManagerType&           mManager;
@@ -386,9 +458,15 @@ Morphology<TreeType>::dilateVoxels(int iterations, NearestNeighbors nn)
 {
     for (int i=0; i<iterations; ++i) {
         switch (nn) {
-        case NN_FACE_EDGE: this->dilateVoxels18(); break;
-        case NN_FACE_EDGE_VERTEX: this->dilateVoxels26(); break;
-        default: this->dilateVoxels6();
+        case NN_FACE_EDGE:
+            this->dilateVoxels18();
+            break;
+        case NN_FACE_EDGE_VERTEX:
+            this->dilateVoxels26();
+            break;
+        case NN_FACE:
+        default:
+            this->dilateVoxels6();
         }
     }
 }
@@ -491,7 +569,6 @@ template<typename TreeType>
 inline void
 Morphology<TreeType>::dilateVoxels26()
 {
-    /// @todo Currently operates only on leaf voxels; need to extend to tiles.
     const int leafCount = static_cast<int>(mManager->leafCount());
 
     // Save the value masks of all leaf nodes.
@@ -626,15 +703,17 @@ template<typename TreeType>
 inline void
 Morphology<TreeType>::ErodeVoxelsOp::runParallel(NearestNeighbors nn)
 {
+    namespace ph = std::placeholders;
     switch (nn) {
     case NN_FACE_EDGE:
-        mTask = boost::bind(&ErodeVoxelsOp::erode18, _1, _2);
+        mTask = std::bind(&ErodeVoxelsOp::erode18, ph::_1, ph::_2);
         break;
     case NN_FACE_EDGE_VERTEX:
-        mTask = boost::bind(&ErodeVoxelsOp::erode26, _1, _2);
+        mTask = std::bind(&ErodeVoxelsOp::erode26, ph::_1, ph::_2);
         break;
+    case NN_FACE:
     default:
-        mTask = boost::bind(&ErodeVoxelsOp::erode6, _1, _2);
+        mTask = std::bind(&ErodeVoxelsOp::erode6, ph::_1, ph::_2);
     }
     tbb::parallel_for(mManager.getRange(), *this);
 }
@@ -907,12 +986,119 @@ deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
     foreach(it, op, /*threaded=*/false);
 }
 
+/// @brief Class that performs multi-threaded dilation with support for active tiles.
+/// @warning Dont use this class directly, instead call the function dilateActiveValues!
+template<typename TreeT>
+class DilationOp
+{
+    typedef typename TreeT::template ValueConverter<ValueMask>::Type MaskT;
+    typedef tbb::enumerable_thread_specific<MaskT>                   PoolT;
+    typedef typename MaskT::LeafNodeType                             LeafT;
+
+    // Very light-weight member data
+    const int mIter;// number of iterations
+    const tools::NearestNeighbors mNN;//enum to specify the dilation scheme
+    PoolT  *mPool;// pointer to the thread-local pool of mask trees
+    LeafT **mLeafs;// raw array of pointers to leaf nodes
+
+public:
+
+    DilationOp(TreeT &tree, int iterations, NearestNeighbors nn, TilePolicy mode)
+        : mIter(iterations), mNN(nn), mPool(nullptr), mLeafs(nullptr)
+    {
+        const size_t numLeafs = this->init( tree, mode );
+        const size_t numThreads = size_t(tbb::task_scheduler_init::default_num_threads());
+        const size_t grainSize = math::Max(size_t(1), numLeafs/(2*numThreads));
+
+        MaskT mask;
+        PoolT pool(mask);// Scoped thread-local storage of mask trees
+        mPool = &pool;
+
+        tbb::parallel_for(tbb::blocked_range<LeafT**>(mLeafs, mLeafs+numLeafs, grainSize), *this);
+
+        delete [] mLeafs;// no more need for the array of leaf node pointers
+
+        typedef typename PoolT::iterator IterT;
+        for (IterT it=pool.begin(); it!=pool.end(); ++it) mask.merge(*it);// fast stealing
+
+        if (mode == PRESERVE_TILES) tools::prune(mask);//multithreaded
+
+        tree.topologyUnion(mask);//multithreaded
+    }
+
+    // This is required by tbb and should never be called directly
+    void operator()(const tbb::blocked_range<LeafT**> &r) const
+    {
+        MaskT mask;// thread-local temporary mask tree
+        for (LeafT** it=r.begin(); it!=r.end(); ++it) mask.addLeaf( *it );
+        tree::LeafManager<MaskT> manager(mask, r.begin(), r.end());
+        tools::dilateVoxels(manager, mIter, mNN);// serial dilation of active voxels
+        mPool->local().merge(mask, MERGE_ACTIVE_STATES);
+    }
+private:
+
+    // Simple wrapper of a raw double-pointer to mimic a std container
+    struct MyArray {
+        typedef LeafT* value_type;//required by Tree::stealNodes
+        value_type* ptr;
+        MyArray(value_type* array) : ptr(array) {}
+        void push_back(value_type leaf) { *ptr++ = leaf; }//required by Tree::stealNodes
+    };
+
+    // Convert active tiles to leafs and de-construct the tree into a linear array of leafs.
+    size_t linearize(MaskT& mask, TilePolicy mode)
+    {
+        if (mode != IGNORE_TILES) mask.voxelizeActiveTiles();//lightweight since this is a mask tree
+        const size_t numLeafs = mask.leafCount();
+        mLeafs = new LeafT*[numLeafs];// fast pre-allocation
+        MyArray tmp(mLeafs);
+        mask.stealNodes(tmp);// serializes the mask tree and leaves it empty
+        return numLeafs;
+    }
+
+    template<typename T>
+    typename std::enable_if<std::is_same<T, MaskT>::value, size_t>::type
+    init(T& tree, TilePolicy mode)
+    {
+        return this->linearize(tree, mode);
+    }
+
+    template<typename T>
+    typename std::enable_if<!std::is_same<T, MaskT>::value, size_t>::type
+    init(const T& tree, TilePolicy mode)
+    {
+        MaskT mask(tree, false, true, TopologyCopy());
+        return this->linearize(mask, mode);
+    }
+
+};// DilationOp
+
+template<typename TreeType>
+OPENVDB_STATIC_SPECIALIZATION inline void
+dilateActiveValues(TreeType& tree, int iterations, NearestNeighbors nn, TilePolicy mode)
+{
+    if (iterations > 0 ) DilationOp<TreeType> tmp(tree, iterations, nn, mode);
+}
+
+template<typename TreeType>
+OPENVDB_STATIC_SPECIALIZATION inline void
+dilateActiveValues(tree::LeafManager<TreeType>& manager,
+                   int iterations,
+                   NearestNeighbors nn,
+                   TilePolicy mode)
+{
+    if (iterations > 0 ) {
+        DilationOp<TreeType> tmp(manager.tree(), iterations, nn, mode);
+        manager.rebuildLeafArray();
+    }
+}
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
