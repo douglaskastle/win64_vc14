@@ -33,8 +33,6 @@
 #if !defined( PTHREAD_H )
 #define PTHREAD_H
 
-#define HAVE_STRUCT_TIMESPEC
-
 /*
  * See the README file for an explanation of the pthreads-win32 version
  * numbering scheme and how the DLL is named etc.
@@ -109,6 +107,10 @@
 #if ( defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112 )  || !defined(PTW32_LEVEL)
 #define PTW32_LEVEL PTW32_LEVEL_MAX
 /* Include everything */
+#endif
+
+#if _MSC_VER >= 1900
+#   define HAVE_STRUCT_TIMESPEC 1
 #endif
 
 #if defined(_UWIN)
@@ -315,16 +317,16 @@ enum {
 #endif
 #endif
 
-//#if !defined(HAVE_STRUCT_TIMESPEC)
+#if !defined(HAVE_STRUCT_TIMESPEC)
 #define HAVE_STRUCT_TIMESPEC
-//#if !defined(_TIMESPEC_DEFINED)
-//#define _TIMESPEC_DEFINED
-//struct timespec {
-//        time_t tv_sec;
-//        long tv_nsec;
-//};
-//#endif /* _TIMESPEC_DEFINED */
-//#endif /* HAVE_STRUCT_TIMESPEC */
+#if !defined(_TIMESPEC_DEFINED)
+#define _TIMESPEC_DEFINED
+struct timespec {
+        time_t tv_sec;
+        long tv_nsec;
+};
+#endif /* _TIMESPEC_DEFINED */
+#endif /* HAVE_STRUCT_TIMESPEC */
 
 #if !defined(SIG_BLOCK)
 #define SIG_BLOCK 0
