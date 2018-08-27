@@ -40,10 +40,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //     for compiled shaders.
 // These are all independent, though loosely coupled.
 
+// Version of the language:
+#define OSL_VERSION_MAJOR 1
+#define OSL_VERSION_MINOR 9
+#define OSL_VERSION_PATCH 9
+#define OSL_VERSION (10000 * OSL_VERSION_MAJOR + \
+                               100 * OSL_VERSION_MINOR + \
+                                     OSL_VERSION_PATCH)
+
 // Version of this library:
 #define OSL_LIBRARY_VERSION_MAJOR 1
-#define OSL_LIBRARY_VERSION_MINOR 7
-#define OSL_LIBRARY_VERSION_PATCH 5
+#define OSL_LIBRARY_VERSION_MINOR 9
+#define OSL_LIBRARY_VERSION_PATCH 9
 #define OSL_LIBRARY_VERSION_RELEASE_TYPE 
 
 #define OSL_LIBRARY_VERSION_CODE (10000 * OSL_LIBRARY_VERSION_MAJOR + \
@@ -59,7 +67,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                             OSL_LIBRARY_VERSION_PATCH, \
                             OSL_LIBRARY_VERSION_RELEASE_TYPE)
 #define OSL_INTRO_STRING "OpenShadingLanguage " OSL_LIBRARY_VERSION_STRING
-#define OSL_COPYRIGHT_STRING "(c) Copyright 2009-2014 Sony Pictures Imageworks, et al. All rights reserved."
+#define OSL_COPYRIGHT_STRING "(c) Copyright 2009-2017 Sony Pictures Imageworks, et al. All rights reserved."
 
 
 // Version numbers for the compiled shader format.  The major number
@@ -78,18 +86,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define OSL_SHADERGLOBALS_HAS_RENDERER_PTR 1
 
 
-#ifdef OSL_NAMESPACE
 // Macros to use in each file to enter and exit the right name spaces.
-#define OSL_NAMESPACE_ENTER namespace OSL_NAMESPACE { namespace OSL {
-#define OSL_NAMESPACE_EXIT }; }; using namespace OSL_NAMESPACE;
-#else
-#define OSL_NAMESPACE_ENTER namespace OSL {
-#define OSL_NAMESPACE_EXIT };
-#endif
+#define OSL_NAMESPACE OSL_v1_9
+#define OSL_NAMESPACE_STRING "OSL_v1_9"
+#define OSL_NAMESPACE_ENTER namespace OSL_v1_9 {
+#define OSL_NAMESPACE_EXIT } namespace OSL = OSL_v1_9;
 
-/// OSL_BUILD_CPP11 will be 1 if this OSL was built using C++11
-#define OSL_BUILD_CPP11 1
-/// OSL_BUILD_USELIBPLUSPLUS will be 1 if this OSL was built using libc++
-#define OSL_BUILD_LIBCPLUSPLUS 0
+#define OSL_BUILD_CPP11 1 /* Always build for C++ >= 11 */
+// OSL_BUILD_CPP14 will be 1 if this OSL was built using C++14
+#define OSL_BUILD_CPP14 0
+// OSL_BUILD_CPP17 will be 1 if this OSL was built using C++17
+#define OSL_BUILD_CPP17 0
 
 #endif /* OSLVERSION_H */
